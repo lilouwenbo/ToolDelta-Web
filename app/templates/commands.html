@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% set active_page = "commands" %}
+{% block content %}
+<div class="page-header">
+    <h1>命令参考</h1>
+    <span id="cmdStats" style="font-size:13px;color:var(--text-secondary)"></span>
+</div>
+
+<div class="search-bar">
+    <input type="text" id="cmdSearch" placeholder="搜索命令或用途..." oninput="renderCommands()">
+    <input type="text" id="cmdPluginFilter" placeholder="按插件名筛选..." oninput="renderCommands()">
+</div>
+
+<div id="cmdList"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var allCommandData = [];
+
+function loadCommands() {
+    fetch('/api/commands/stats')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            allCommandData = d.plugins || [];
+            document.getElementById('cmdStats').textContent = '共 ' + d.total_commands + ' 个命令，来自 ' + d.total_plugins + ' 个插件';
+            renderCommands();
+        });
+}
+
+function renderCommands() {
+    var q = document.getElementById('cmdSearch').value.toLowerCase();
+    var pluginFilter = document.getElementById('cmdPluginFilter').value.toLowerCase();
+    var data = allCommandData;
+
+    if (pluginFilter) {
+        data = data.filter(function(p) { return p.plugin.toLowerCase().indexOf(pluginFilter) !== -1; });
+    }
+    if (q) {
+        data = data.map(function(p) {
+            var cmds = p.commands.filter(function(c) {
+                return c.triggers.some(function(t) { return t.toLowerCase().indexOf(q) !== -1; }) ||
+                       (c.usage || '').toLowerCase().indexOf(q) !== -1;
+            });
+            return { plugin: p.plugin, commands: cmds, count: cmds.length, is_enabled: p.is_enabled };
+        }).filter(function(p) { return p.count > 0; });
+    }
+
+    var container = document.getElementById('cmdList');
+    if (data.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">---</div>未找到命令</div>';
+        return;
+    }
+
+    container.innerHTML = data.map(function(p, idx) {
+        return '<div class="cmd-card">' +
+            '<div class="cmd-header" onclick="var n=this.nextElementSibling;n.style.display=n.style.display===\'none\'?\'block\':\'none\'">' +
+            '<span><strong>' + p.plugin + '</strong> <span class="badge badge-count">' + p.count + ' 个命令</span></span>' +
+            '<span style="font-size:12px;color:var(--text-secondary)">' + (p.is_enabled ? '已启用' : '已禁用') + '</span>' +
+            '</div>' +
+            '<div class="cmd-body" style="display:' + (idx === 0 ? 'block' : 'none') + '">' +
+            p.commands.map(function(c) {
+                return '<div class="cmd-row">' +
+                    '<span class="triggers">' + c.triggers.join('、') + '</span>' +
+                    '<span class="hint">' + (c.hint || '') + '</span>' +
+                    '<span class="usage">' + (c.usage || '') + '</span>' +
+                    '</div>';
+            }).join('') +
+            '</div></div>';
+    }).join('');
+}
+
+loadCommands();
+</script>
+{% endblock %}

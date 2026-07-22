@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% set active_page = "logs" %}
+{% block content %}
+<div class="page-header">
+    <h1>日志</h1>
+    <div>
+        <button class="btn btn-outline" onclick="refreshLogs()">刷新</button>
+        <button class="btn btn-outline" onclick="clearDisplay()">清屏</button>
+    </div>
+</div>
+
+<div class="search-bar">
+    <input type="text" id="logFilter" placeholder="过滤日志..." oninput="filterLogs()">
+    <select id="logDate" onchange="loadLogs()">
+        <option value="today">今天</option>
+    </select>
+</div>
+
+<div class="console-wrap">
+    <div class="console-header">
+        <span id="logStatus">日志</span>
+        <span id="logCount">0 行</span>
+    </div>
+    <div class="console-body" id="logBody" style="height:600px"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var allLogLines = [];
+
+function loadLogs() {
+    var sel = document.getElementById('logDate');
+    var val = sel.value;
+    var url;
+    if (val === 'today') {
+        url = '/api/logs?tail=1000';
+    } else {
+        url = '/api/logs/file?date=' + val;
+    }
+    fetch(url)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            allLogLines = d.lines || [];
+            document.getElementById('logCount').textContent = allLogLines.length + ' 行';
+            filterLogs();
+        });
+}
+
+function filterLogs() {
+    var q = document.getElementById('logFilter').value.toLowerCase();
+    var lines = q ? allLogLines.filter(function(l) { return l.toLowerCase().indexOf(q) !== -1; }) : allLogLines;
+    var body = document.getElementById('logBody');
+    body.innerHTML = lines.map(function(l) {
+        var cls = 'line-output';
+        if (l.indexOf('[ERROR]') !== -1) cls = 'line-err';
+        else if (l.indexOf('[WARN]') !== -1) cls = 'line-warn';
+        else if (l.indexOf('[INFO]') !== -1) cls = 'line-system';
+        return '<div class="' + cls + '">' + escapeHtml(l) + '</div>';
+    }).join('');
+    body.scrollTop = body.scrollHeight;
+}
+
+function refreshLogs() {
+    loadDates();
+    loadLogs();
+}
+
+function clearDisplay() {
+    document.getElementById('logBody').innerHTML = '';
+    allLogLines = [];
+    document.getElementById('logCount').textContent = '0 行';
+}
+
+function loadDates() {
+    fetch('/api/logs/files')
+        .then(function(r) { return r.json(); })
+        .then(function(files) {
+            var sel = document.getElementById('logDate');
+            var current = sel.value;
+            sel.innerHTML = '<option value="today">今天</option>';
+            files.forEach(function(f) {
+                var opt = '<option value="' + f.date + '">' + f.date + ' (' + (f.size / 1024).toFixed(1) + ' KB)</option>';
+                sel.innerHTML += opt;
+            });
+            sel.value = current;
+        });
+}
+
+function escapeHtml(text) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(text));
+    return d.innerHTML;
+}
+
+loadDates();
+loadLogs();
+setInterval(loadLogs, 5000);
+</script>
+{% endblock %}

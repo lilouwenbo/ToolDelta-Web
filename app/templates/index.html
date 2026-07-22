@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% set active_page = "index" %}
+{% block content %}
+<div class="page-header">
+    <h1>仪表盘</h1>
+    <button class="btn" id="mainToggleBtn" onclick="toggleTool()">启动中...</button>
+</div>
+
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="icon" id="statusIcon">---</div>
+        <div class="value" id="statusText">检测中...</div>
+        <div class="label">运行状态</div>
+    </div>
+    <div class="stat-card">
+        <div class="icon">插件</div>
+        <div class="value" id="pluginCount">-</div>
+        <div class="label">插件数量</div>
+    </div>
+    <div class="stat-card">
+        <div class="icon">市场</div>
+        <div class="value" id="marketCount">-</div>
+        <div class="label">市场插件数</div>
+    </div>
+    <div class="stat-card">
+        <div class="icon">备份</div>
+        <div class="value" id="backupCount">-</div>
+        <div class="label">备份数量</div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>快捷操作</h3>
+    <div class="quick-actions">
+        <button class="btn btn-primary" onclick="location.href='/console'">打开控制台</button>
+        <button class="btn btn-outline" onclick="location.href='/plugins'">插件管理</button>
+        <button class="btn btn-outline" onclick="location.href='/market'">浏览市场</button>
+        <button class="btn btn-outline" onclick="location.href='/backup'">备份</button>
+        <button class="btn btn-outline" onclick="location.href='/commands'">命令参考</button>
+    </div>
+</div>
+
+<div class="card">
+    <h3>系统信息</h3>
+    <table>
+        <tbody id="sysInfoTable">
+            <tr><td style="width:160px">Python 版本</td><td id="infoPython">-</td></tr>
+            <tr><td>操作系统</td><td id="infoPlatform">-</td></tr>
+            <tr><td>ToolDelta 目录</td><td id="infoDir">-</td></tr>
+            <tr><td>ToolDelta 状态</td><td id="infoExists">-</td></tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadDashboard() {
+    try {
+        const [status, sysInfo, plugins, market, backups] = await Promise.all([
+            fetch('/api/status').then(function(r){return r.json()}),
+            fetch('/api/system/info').then(function(r){return r.json()}),
+            fetch('/api/plugins').then(function(r){return r.json()}),
+            fetch('/api/market/plugins').then(function(r){return r.json()}),
+            fetch('/api/backups').then(function(r){return r.json()}),
+        ]);
+        var icon = document.getElementById('statusIcon');
+        var text = document.getElementById('statusText');
+        if (status.running) {
+            icon.textContent = 'ON';
+            text.textContent = '运行中';
+        } else {
+            icon.textContent = 'OFF';
+            text.textContent = '已停止';
+        }
+        document.getElementById('pluginCount').textContent = sysInfo.plugin_count || plugins.length;
+        document.getElementById('marketCount').textContent = market.length;
+        document.getElementById('backupCount').textContent = backups.length;
+        document.getElementById('infoPython').textContent = sysInfo.python_version;
+        document.getElementById('infoPlatform').textContent = sysInfo.platform;
+        document.getElementById('infoDir').textContent = sysInfo.tooldelta_dir;
+        document.getElementById('infoExists').textContent = sysInfo.tooldelta_exists ? '存在' : '不存在';
+    } catch(e) { console.error(e); }
+}
+loadDashboard();
+setInterval(loadDashboard, 5000);
+</script>
+{% endblock %}

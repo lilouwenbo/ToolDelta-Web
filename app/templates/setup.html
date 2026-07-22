@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>初始化 - ToolDelta Web</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .auth-page {
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; background: var(--canvas);
+            position: relative;
+        }
+        .auth-wallpaper-bg {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-size: cover; background-position: center; z-index: 0;
+        }
+        .auth-wallpaper-bg::after {
+            content: ''; position: absolute; inset: 0;
+            background: rgba(1,1,2,0.55);
+        }
+        .auth-card { position: relative; z-index: 1; }
+        .auth-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 40px; width: 100%; max-width: 380px;
+        }
+        .auth-card h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; text-align: center; }
+        .auth-card p.sub { font-size: 13px; color: var(--ink-muted); text-align: center; margin-bottom: 28px; }
+        .auth-card .logo-big { display: block; width: 56px; height: 56px; margin: 0 auto 16px; background: var(--accent); border-radius: 14px; line-height: 56px; text-align: center; font-size: 24px; font-weight: 700; color: #fff; }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--ink); }
+        .form-group input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--canvas); color: var(--ink); font-size: 14px; outline: none; box-sizing: border-box; }
+        .form-group input:focus { border-color: var(--accent); }
+        .auth-card .btn { width: 100%; padding: 10px; font-size: 15px; margin-top: 4px; }
+        .auth-error { color: #f87171; font-size: 13px; text-align: center; margin-top: 12px; display: none; }
+    </style>
+</head>
+<body class="auth-page">
+    {% if wallpaper_url %}<div class="auth-wallpaper-bg" style="background-image:url('{{ wallpaper_url }}')"></div>{% endif %}
+    <div class="auth-card">
+        <span class="logo-big">TD</span>
+        <h1>首次初始化</h1>
+        <p class="sub">设置管理员账号和密码</p>
+        <div class="form-group">
+            <label for="username">用户名</label>
+            <input type="text" id="username" placeholder="设置用户名" autocomplete="username">
+        </div>
+        <div class="form-group">
+            <label for="password">密码</label>
+            <input type="password" id="password" placeholder="设置密码" autocomplete="new-password">
+            <span style="font-size:11px;color:var(--ink-tertiary);margin-top:4px;display:block">密码长度1-64位</span>
+        </div>
+        <div class="form-group">
+            <label for="password2">确认密码</label>
+            <input type="password" id="password2" placeholder="再次输入密码" autocomplete="new-password">
+        </div>
+        <button class="btn btn-primary" onclick="doSetup()">初始化</button>
+        <div class="auth-error" id="authError"></div>
+    </div>
+    <script>
+        function doSetup() {
+            var u = document.getElementById('username').value.trim();
+            var p = document.getElementById('password').value;
+            var p2 = document.getElementById('password2').value;
+            if (!u || !p) { showError('请输入用户名和密码'); return; }
+            if (p !== p2) { showError('两次密码不一致'); return; }
+            if (p.length < 1) { showError('密码不能为空'); return; }
+            if (p.length > 64) { showError('密码最长64位'); return; }
+            fetch('/api/setup', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p}) })
+            .then(function(r){return r.json()})
+            .then(function(d){
+                if(d.success){ window.location.href='/'; }
+                else { showError(d.error||'初始化失败'); }
+            })
+            .catch(function(){ showError('请求失败'); });
+        }
+        function showError(msg) {
+            var el = document.getElementById('authError');
+            el.textContent = msg; el.style.display = 'block';
+        }
+        document.getElementById('password2').addEventListener('keydown', function(e){ if(e.key==='Enter') doSetup(); });
+    </script>
+</body>
+</html>

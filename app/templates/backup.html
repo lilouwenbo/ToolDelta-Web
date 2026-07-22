@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% set active_page = "backup" %}
+{% block content %}
+<div class="page-header">
+    <h1>备份与恢复</h1>
+    <div>
+        <button class="btn btn-primary" onclick="createBackup()">创建备份</button>
+        <button class="btn btn-danger" onclick="showFactoryReset()">恢复出厂设置</button>
+    </div>
+</div>
+
+<div class="card">
+    <h3>说明</h3>
+    <p style="font-size:13px;color:var(--ink-subtle)">备份将保存 插件文件、插件配置文件、插件数据文件和 ToolDelta 基本配置。恢复出厂设置将清空所有插件、配置和数据。</p>
+</div>
+
+<div id="backupList"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadBackups() {
+    fetch('/api/backups')
+        .then(function(r) { return r.json(); })
+        .then(function(backups) {
+            var container = document.getElementById('backupList');
+            if (backups.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">---</div>暂无备份</div>';
+                return;
+            }
+            container.innerHTML = backups.map(function(b) {
+                return '<div class="card" style="display:flex;justify-content:space-between;align-items:center">' +
+                    '<div><strong>' + b.name + '</strong>' +
+                    '<div style="font-size:12px;color:var(--ink-subtle);margin-top:4px">' + b.time + ' | ' + (b.size / 1024).toFixed(1) + ' KB</div></div>' +
+                    '<div style="display:flex;gap:8px">' +
+                    '<button class="btn btn-sm btn-primary" onclick="restoreBackup(\'' + b.zip + '\')">还原</button>' +
+                    '<button class="btn btn-sm btn-danger" onclick="deleteBackup(\'' + b.zip + '\')">删除</button></div></div>';
+            }).join('');
+        });
+}
+
+function createBackup() {
+    var name = prompt('备份名称（可选）:');
+    fetch('/api/backup/create', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name: name || undefined}) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) { showToast('备份创建成功: ' + d.name, 'success'); loadBackups(); });
+}
+
+function restoreBackup(zip) {
+    showConfirm('确定还原此备份？当前数据将被覆盖。建议先创建备份。', function(ok) {
+        if (!ok) return;
+        fetch('/api/backup/restore', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({zip: zip}) })
+            .then(function(r) { return r.json(); })
+            .then(function(d) { showToast(d.success ? '还原成功' : '还原失败: ' + d.message, d.success ? 'success' : 'error'); });
+    });
+}
+
+function deleteBackup(zip) {
+    showConfirm('确定删除此备份？', function(ok) {
+        if (!ok) return;
+        fetch('/api/backup/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({zip: zip}) })
+            .then(function() { showToast('已删除', 'info'); loadBackups(); });
+    });
+}
+
+function showFactoryReset() {
+    showConfirm('确定恢复出厂设置？这将清空所有插件、配置和数据！建议先创建备份。', function(ok) {
+        if (!ok) return;
+        showConfirm('再次确认：此操作不可撤销！', function(ok2) {
+            if (!ok2) return;
+            fetch('/api/reset', { method:'POST' })
+                .then(function() { showToast('已恢复出厂设置', 'success'); });
+        });
+    });
+}
+
+loadBackups();
+</script>
+{% endblock %}

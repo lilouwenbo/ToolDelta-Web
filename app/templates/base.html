@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToolDelta Web 管理面板</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    {% if wallpaper_url %}<div class="wallpaper-bg" style="background-image:url('{{ wallpaper_url }}')"></div>{% endif %}
+    <aside class="sidebar" id="sidebar"{% if wallpaper_url %} style="background:rgba(15,16,17,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-right-color:rgba(255,255,255,0.06)"{% endif %}>
+        <div class="brand">
+            <span class="logo">TD</span>
+            <span>ToolDelta</span>
+            <span class="status-dot" id="sidebarStatus"></span>
+        </div>
+        <nav>
+            <a href="/" class="{% if active_page == 'index' %}active{% endif %}">仪表盘</a>
+            <a href="/console" class="{% if active_page == 'console' %}active{% endif %}">控制台</a>
+            <a href="/plugins" class="{% if active_page == 'plugins' %}active{% endif %}">插件管理</a>
+            <a href="/market" class="{% if active_page == 'market' %}active{% endif %}">插件市场</a>
+            <a href="/files" class="{% if active_page == 'files' %}active{% endif %}">文件管理</a>
+            <a href="/commands" class="{% if active_page == 'commands' %}active{% endif %}">命令参考</a>
+            <a href="/backup" class="{% if active_page == 'backup' %}active{% endif %}">备份恢复</a>
+            <a href="/logs" class="{% if active_page == 'logs' %}active{% endif %}">日志</a>
+            <a href="/settings" class="{% if active_page == 'settings' %}active{% endif %}" style="margin-top:8px;border-top:1px solid var(--hairline);padding-top:12px">面板设置</a>
+        </nav>
+        <div style="padding:12px;text-align:center;font-size:12px;color:var(--ink-tertiary);border-top:1px solid var(--hairline)">
+            {{ session.get('username','?') }} · <a href="/logout" style="color:var(--ink-muted);text-decoration:none">退出</a>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal" style="max-width:420px">
+            <h2 id="confirmTitle">确认</h2>
+            <p id="confirmMessage" style="font-size:14px;color:var(--ink-muted);line-height:1.6;margin-bottom:8px"></p>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeConfirm(false)">取消</button>
+                <button class="btn btn-danger" id="confirmOkBtn" onclick="closeConfirm(true)">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/socket.io.min.js"></script>
+    <script src="/static/js/main.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
