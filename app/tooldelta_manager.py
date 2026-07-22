@@ -16,6 +16,15 @@ _ANSI_SEQ_RE = re.compile(r"\x1b\[([0-9;]*)m")
 # 匹配除 SGR 颜色序列(\x1b[...m)之外的所有 ANSI 控制序列(清屏/清行/光标移动等)，
 # 避免在控制台中渲染出乱码控制字符。排除 m/M 结尾以保留颜色序列供后续转换。
 _ANSI_NON_COLOR_RE = re.compile(r"\x1b\[[0-9;?]*[a-ln-zA-Z]")
+# 剥离"非 CSI"的终端控制序列：OSC(\x1b]...title...\x07/ST)、字符集/私有模式
+# (\x1b(0 等行绘制字符集)、以及任何孤立 ESC。这些序列在 Web 终端里无法渲染，
+# 若不清理会以裸控制字符(乱码)形式残留，表现为"终端字符转义失效"。
+# 负向先行 (?![\[]) 保证不误伤 CSI(\x1b[...，含颜色 SGR) 序列。
+_ANSI_NON_CSI_RE = re.compile(
+    r"\x1b\][^\x07\x1b]*?(?:\x07|\x1b\\)"   # OSC: \x1b]...BEL/ST
+    r"|\x1b[\(\)\*\+\-\.\/][^\x1b]?"        # 字符集/私有模式: \x1b(0 等
+    r"|\x1b(?![\[])"                         # 兜底: 孤立 ESC(排除 CSI)
+)
 
 _ANSI_COLORS = {
     "0;30": "#000", "0;31": "#e74c3c", "0;32": "#2ecc71", "0;33": "#f1c40f",
@@ -31,10 +40,14 @@ _ANSI_COLORS = {
 def strip_ansi(text):
     text = _MC_COLOR_RE.sub("", text)
     text = _ANSI_ESCAPE_RE.sub("", text)
+    text = _ANSI_NON_CSI_RE.sub("", text)
     return text
 
 def ansi_to_html(text):
     text = _MC_COLOR_RE.sub("", text)
+    # 先剥离 OSC/字符集/孤立 ESC(非 CSI 控制序列)，避免裸控制字符残留成乱码；
+    # 再剥离 CSI 非颜色序列，保留 SGR(\x1b[...m) 供下方颜色转换。
+    text = _ANSI_NON_CSI_RE.sub("", text)
     text = _ANSI_NON_COLOR_RE.sub("", text)
     parts = _ANSI_SEQ_RE.split(text)
     html = ""
