@@ -5,6 +5,8 @@ import subprocess
 import threading
 import time
 import locale
+import shutil
+import zipfile
 from flask import current_app
 from app.log_service import log_service
 
@@ -121,6 +123,48 @@ class ToolDeltaManager:
     def init_app(self, app):
         self.app = app
 
+    def _ensure_main_program(self):
+        """确保主程序存在：首次启动且 TOOLDELTA_DIR 为空（没有 main.py）时，
+        自动从出厂包(TOOLDELTA_SOURCE_ZIP)解压初始主程序到 TOOLDELTA_DIR。
+        返回 (ok, msg)。
+        """
+        app = self.app
+        td_dir = app.config["TOOLDELTA_DIR"]
+        main_py = app.config["TOOLDELTA_MAIN"]
+        if os.path.isfile(main_py):
+            return True, "主程序已存在"
+        zip_path = app.config.get("TOOLDELTA_SOURCE_ZIP")
+        if not zip_path or not os.path.isfile(zip_path):
+            return False, "出厂程序包不存在: " + (zip_path or "未配置")
+        try:
+            with zipfile.ZipFile(zip_path) as z:
+                names = z.namelist()
+            # 出厂包通常带统一顶层目录(如 ToolDelta-main/)，解压时剥离，
+            # 确保 main.py 落在 TOOLDELTA_DIR 下，避免出现嵌套目录。
+            top = ""
+            if names and "/" in names[0]:
+                top = names[0].split("/", 1)[0] + "/"
+            os.makedirs(td_dir, exist_ok=True)
+            with zipfile.ZipFile(zip_path) as z:
+                for info in z.infolist():
+                    rel = info.filename[len(top):] if (top and info.filename.startswith(top)) else info.filename
+                    if not rel:
+                        continue
+                    dest = os.path.join(td_dir, rel)
+                    if info.filename.endswith("/"):
+                        os.makedirs(dest, exist_ok=True)
+                    else:
+                        parent = os.path.dirname(dest)
+                        if parent:
+                            os.makedirs(parent, exist_ok=True)
+                        with z.open(info) as src, open(dest, "wb") as dst:
+                            shutil.copyfileobj(src, dst)
+            if not os.path.isfile(main_py):
+                return False, "解压完成但 main.py 未生成，请检查出厂包"
+            return True, "已从出厂包解压主程序"
+        except Exception as e:
+            return False, f"解压出厂包失败: {e}"
+
     def start(self):
         with self._lock:
             if self.running:
@@ -131,8 +175,12 @@ class ToolDeltaManager:
             main_py = self.app.config["TOOLDELTA_MAIN"]
             td_dir = self.app.config["TOOLDELTA_DIR"]
             if not os.path.isfile(main_py):
-                self._broadcast("system", "找不到 " + main_py)
-                return False
+                # 首次启动/初始化时 TOOLDELTA_DIR 可能为空，自动解压出厂包让主程序就绪
+                ok, msg = self._ensure_main_program()
+                if not ok:
+                    self._broadcast("system", "找不到 " + main_py + "（" + msg + "）")
+                    return False
+                self._broadcast("system", msg)
             try:
                 startupinfo = None
                 if os.name == "nt":
