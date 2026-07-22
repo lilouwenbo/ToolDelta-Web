@@ -17,7 +17,7 @@ def create_app():
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
-    from app.routes import main, console, plugins, market, backup, commands, api, logs, auth, files
+    from app.routes import main, console, plugins, market, backup, commands, api, logs, auth, files, connections, watchdog, scheduler, dashboard
     app.register_blueprint(main.bp)
     app.register_blueprint(console.bp)
     app.register_blueprint(plugins.bp)
@@ -28,6 +28,10 @@ def create_app():
     app.register_blueprint(logs.bp)
     app.register_blueprint(auth.bp)
     app.register_blueprint(files.bp)
+    app.register_blueprint(connections.bp)
+    app.register_blueprint(watchdog.bp)
+    app.register_blueprint(scheduler.bp)
+    app.register_blueprint(dashboard.bp)
 
     socketio.init_app(app, cors_allowed_origins="*", async_mode="threading")
 
@@ -45,6 +49,16 @@ def create_app():
 
     from app.socket_events import init_socketio
     init_socketio(socketio)
+
+    # 新增模块（P1/P2 增强）
+    from app import connection_service as conn_svc
+    conn_svc.init_app(app)
+    from app.watchdog_service import watchdog_service
+    watchdog_service.init_app(app)
+    from app.scheduler_service import scheduler_service
+    scheduler_service.init_app(app)
+    from app.dashboard_service import dashboard_service
+    dashboard_service.init_app(app)
 
     @app.before_request
     def check_auth():

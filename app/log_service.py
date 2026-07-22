@@ -84,4 +84,64 @@ class LogService:
                 return [l.rstrip("\r\n") for l in f.readlines()]
         return []
 
+    # ─── 日志增强：分级 / 搜索 / 过滤 / 导出 ─────────────
+
+    LEVELS = ["INFO", "WARN", "ERROR"]
+
+    @staticmethod
+    def _parse_line(line):
+        """解析单行日志，返回 dict 或 None。"""
+        m = re.match(r"^\[(\d{2}:\d{2}:\d{2})\]\[(\w+)\]\[([^\]]+)\]\s*(.*)$", line)
+        if not m:
+            return None
+        return {
+            "time": m.group(1),
+            "level": m.group(2),
+            "source": m.group(3),
+            "message": m.group(4),
+        }
+
+    def query(self, level=None, source=None, keyword=None, date=None, limit=500):
+        """按级别 / 来源 / 关键字 / 日期过滤日志，返回最后 limit 条（保持原顺序）。"""
+        if date is None or date == self._today:
+            lines = self._today_lines
+        else:
+            lines = self.get_log_file(date)
+        results = []
+        for raw in lines:
+            parsed = self._parse_line(raw)
+            if not parsed:
+                continue
+            if level and parsed["level"].lower() != level.lower():
+                continue
+            if source and parsed["source"] != source:
+                continue
+            if keyword and keyword.lower() not in parsed["message"].lower():
+                continue
+            results.append(parsed)
+        if limit is not None:
+            results = results[-limit:]
+        return results
+
+    def list_sources(self, date=None):
+        """返回某日日志中出现过的全部来源（去重并排序）。"""
+        if date is None or date == self._today:
+            lines = self._today_lines
+        else:
+            lines = self.get_log_file(date)
+        sources = set()
+        for raw in lines:
+            parsed = self._parse_line(raw)
+            if parsed:
+                sources.add(parsed["source"])
+        return sorted(sources)
+
+    def export_text(self, date=None, level=None, source=None, keyword=None):
+        """将过滤后的日志拼成纯文本，每行 '时间 [LEVEL][SOURCE] message'。"""
+        results = self.query(level=level, source=source, keyword=keyword, date=date)
+        return "\n".join(
+            f"{r['time']} [{r['level']}][{r['source']}] {r['message']}" for r in results
+        )
+
+
 log_service = LogService()

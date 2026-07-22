@@ -29,6 +29,44 @@
     </div>
 </div>
 
+<div class="stat-grid" id="dashStats">
+    <div class="stat-card">
+        <div class="icon">CPU</div>
+        <div class="value" id="dashCpu">0.0%</div>
+        <div class="label">CPU 使用率</div>
+    </div>
+    <div class="stat-card">
+        <div class="icon">内存</div>
+        <div class="value" id="dashMem">0 MB</div>
+        <div class="label">内存使用</div>
+    </div>
+    <div class="stat-card">
+        <div class="icon">磁盘</div>
+        <div class="value" id="dashDisk">0.0 GB</div>
+        <div class="label">磁盘剩余</div>
+    </div>
+    <div class="stat-card">
+        <div class="icon" id="dashToolIcon">---</div>
+        <div class="value" id="dashToolStatus">检测中...</div>
+        <div class="label">ToolDelta</div>
+    </div>
+    <div class="stat-card">
+        <div class="icon">看门狗</div>
+        <div class="value" id="dashWatchdog">关</div>
+        <div class="label">看门狗</div>
+    </div>
+    <div class="stat-card">
+        <div class="icon">连接</div>
+        <div class="value" id="dashConnections">0</div>
+        <div class="label">服务器连接</div>
+    </div>
+    <div class="stat-card">
+        <div class="icon">插件</div>
+        <div class="value" id="dashPlugins">0</div>
+        <div class="label">插件数量</div>
+    </div>
+</div>
+
 <div class="card">
     <h3>快捷操作</h3>
     <div class="quick-actions">
@@ -85,4 +123,7 @@ async function loadDashboard() {
 loadDashboard();
 setInterval(loadDashboard, 5000);
 </script>
+
+<script src="/static/js/dashboard.js"></script>
+<script>loadDashboardStats();</script>
 {% endblock %}

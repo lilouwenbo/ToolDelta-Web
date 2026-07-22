@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% set active_page = "connections" %}
+{% block content %}
+<style>
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--ink); }
+    .form-group input, .form-group select, .form-group textarea {
+        width: 100%; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--border);
+        background: var(--canvas); color: var(--ink); font-size: 14px; outline: none; box-sizing: border-box;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent); }
+    .form-row { display: flex; gap: 12px; }
+    .form-row .form-group { flex: 1; }
+    .badge-default { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px;
+        background: var(--accent); color: #fff; }
+    .badge-normal { color: var(--ink-subtle); font-size: 13px; }
+</style>
+
+<div class="page-header">
+    <h1>服务器连接</h1>
+    <div>
+        <button class="btn btn-primary" onclick="openForm()">添加连接</button>
+    </div>
+</div>
+
+<div class="card">
+    <table class="table" style="width:100%">
+        <thead>
+            <tr>
+                <th>名称</th>
+                <th>地址</th>
+                <th>协议</th>
+                <th>默认</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody id="connTableBody">
+        </tbody>
+    </table>
+    <div id="connEmpty" class="empty-state" style="display:none">
+        <div class="icon">---</div>暂无连接，点击右上角「添加连接」创建。
+    </div>
+</div>
+
+<!-- 添加 / 编辑 表单弹窗 -->
+<div class="modal-overlay" id="connModal">
+    <div class="modal" style="max-width:520px">
+        <h2 id="connModalTitle">添加连接</h2>
+        <input type="hidden" id="connId">
+        <div class="form-group">
+            <label for="connName">名称</label>
+            <input type="text" id="connName" placeholder="例如：本地服务器">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="connHost">地址 (host)</label>
+                <input type="text" id="connHost" placeholder="例如：127.0.0.1">
+            </div>
+            <div class="form-group" style="max-width:140px">
+                <label for="connPort">端口 (port)</label>
+                <input type="number" id="connPort" placeholder="8080">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="connProtocol">协议</label>
+            <select id="connProtocol">
+                <option value="tcp">tcp</option>
+                <option value="ws">ws</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="connToken">Token（可选）</label>
+            <input type="text" id="connToken" placeholder="可选">
+        </div>
+        <div class="form-group">
+            <label for="connNote">备注（可选）</label>
+            <textarea id="connNote" rows="2" placeholder="可选"></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeForm()">取消</button>
+            <button class="btn btn-primary" onclick="submitForm()">保存</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/connections.js"></script>
+{% endblock %}
