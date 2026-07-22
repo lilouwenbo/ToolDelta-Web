@@ -19,6 +19,7 @@ ToolDelta/
 plugin_market/
 bridge_plugin/__pycache__/
 instance/
+data/
 *.db
 *.sqlite3
 

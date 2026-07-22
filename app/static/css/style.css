@@ -612,3 +612,84 @@ hr {
   .stat-grid { grid-template-columns: 1fr; }
   .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
 }
+
+/* ─── UI 升级：参考 easynode 设计语言 ─── */
+
+/* 金色渐变 logo 与品牌名（参照 easynode 金色 #ffc021 → #e4d1a1） */
+.sidebar .brand .logo {
+  background: linear-gradient(135deg, #ffc021, #e4d1a1);
+  color: #1a1408;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(255, 192, 33, 0.35);
+}
+.brand-name {
+  background: linear-gradient(135deg, #ffc021, #e4d1a1);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 700;
+}
+
+/* 侧边栏底部：主题切换 + 用户卡片 */
+.sidebar-footer {
+  padding: 10px 12px 14px;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  border: 1px solid var(--hairline);
+  background: var(--surface-1);
+  color: var(--ink-muted);
+  border-radius: var(--r-md);
+  padding: 8px;
+  font-size: 12px;
+  transition: 0.15s;
+}
+.theme-toggle:hover { border-color: var(--primary); color: var(--ink); }
+.user-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+}
+.user-name { font-size: 12px; color: var(--ink-muted); font-weight: 500; }
+.logout-link { font-size: 12px; color: var(--ink-subtle); text-decoration: none; }
+.logout-link:hover { color: var(--danger); }
+
+/* 卡片柔和阴影：easynode 的轻量层次感 */
+.card { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); }
+.console-wrap { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); }
+
+/* 浅色主题（参照 easynode 浅色底 #E7EBF4 + 白卡片） */
+body.theme-light {
+  --canvas: #eef1f6;
+  --surface-1: #ffffff;
+  --surface-2: #f4f6fa;
+  --surface-3: #eaeef5;
+  --surface-4: #e2e7f0;
+  --ink: #1a1d23;
+  --ink-muted: #3a4150;
+  --ink-subtle: #6b7280;
+  --ink-tertiary: #9aa3b2;
+  --hairline: #dde2ea;
+  --hairline-strong: #c8cfdb;
+}
+body.theme-light .wallpaper-bg::after { background: rgba(255, 255, 255, 0.35); }
+body.theme-light input[type="text"],
+body.theme-light input[type="url"],
+body.theme-light input[type="number"],
+body.theme-light input[type="password"],
+body.theme-light textarea,
+body.theme-light select { box-shadow: none; }
+body.theme-light .card,
+body.theme-light .console-wrap { box-shadow: 0 1px 3px rgba(20, 30, 60, 0.08); }

@@ -13,15 +13,20 @@
     <div class="console-bar">
         <span id="consoleStatus">未连接</span>
     </div>
+    <div class="fav-strip" id="favStrip"></div>
     <div class="console-body" id="consoleBody"></div>
     <div class="console-foot">
-        <input id="consoleInput" placeholder="输入命令..." autocomplete="off">
+        <input id="consoleInput" placeholder="输入命令...（↑/↓ 翻历史，Tab 补全）" autocomplete="off">
     </div>
 </div>
 
 <style>
 .console-wrap { background:#000; border:1px solid var(--hairline); border-radius:var(--r-lg); overflow:hidden; }
 .console-bar { display:flex; align-items:center; padding:8px 14px; background:var(--surface-1); border-bottom:1px solid var(--hairline); font-size:12px; color:var(--ink-muted); }
+.fav-strip { display:flex; flex-wrap:wrap; gap:6px; padding:8px 12px; background:var(--canvas); border-bottom:1px solid var(--hairline); min-height:34px; align-items:center; }
+.fav-empty { font-size:12px; color:var(--ink-tertiary); }
+.fav-chip { cursor:pointer; border:1px solid var(--hairline); background:var(--surface-1); color:var(--ink); border-radius:var(--r-sm); padding:3px 10px; font-size:12px; font-family:inherit; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fav-chip:hover { border-color:var(--primary); color:var(--primary); }
 .console-body { height:440px; overflow-y:scroll; overflow-x:auto; padding:8px 12px; font-family:Consolas,'Microsoft YaHei',monospace; font-size:13px; line-height:1.5; white-space:pre; }
 .console-foot { display:flex; border-top:1px solid var(--hairline); background:var(--canvas); }
 .console-foot input { flex:1; padding:10px 14px; border:none; background:transparent; color:var(--ink); font-size:13px; font-family:inherit; outline:none; }

@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 from flask import Flask, session, redirect, request
 from flask_socketio import SocketIO
@@ -8,6 +9,7 @@ socketio = SocketIO()
 def create_app():
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config.from_object(Config)
+    os.makedirs(app.config.get("WEB_DATA_DIR"), exist_ok=True)
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
     app.config["SESSION_PERMANENT"] = True
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)

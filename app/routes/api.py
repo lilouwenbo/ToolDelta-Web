@@ -267,6 +267,59 @@ def commands_stats():
     total_plugins = len(results)
     return jsonify({"total_commands": total_cmds, "total_plugins": total_plugins, "plugins": results})
 
+# ─── 命令收藏（用户级，存于 Web 数据目录的 favorites.json） ────────────────
+def _fav_path():
+    base = current_app.config.get("WEB_DATA_DIR")
+    os.makedirs(base, exist_ok=True)
+    return os.path.join(base, "favorites.json")
+
+def _load_fav():
+    try:
+        with open(_fav_path(), "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _save_fav(data):
+    with open(_fav_path(), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def _user_favs():
+    user = session.get("username") or "default"
+    return _load_fav().get(user, [])
+
+def _set_user_favs(cmds):
+    user = session.get("username") or "default"
+    data = _load_fav()
+    data[user] = cmds
+    _save_fav(data)
+
+@bp.route("/favorites", methods=["GET"])
+def list_favorites():
+    return jsonify({"commands": _user_favs()})
+
+@bp.route("/favorites", methods=["POST"])
+def add_favorite():
+    data = request.get_json(silent=True) or {}
+    cmd = (data.get("cmd") or "").strip()
+    if not cmd:
+        return jsonify({"success": False, "error": "命令不能为空"})
+    cmds = _user_favs()
+    if cmd not in cmds:
+        cmds.append(cmd)
+        _set_user_favs(cmds)
+    return jsonify({"success": True, "commands": cmds})
+
+@bp.route("/favorites", methods=["DELETE"])
+def remove_favorite():
+    data = request.get_json(silent=True) or {}
+    cmd = (data.get("cmd") or "").strip()
+    if not cmd:
+        return jsonify({"success": False, "error": "命令不能为空"})
+    cmds = [c for c in _user_favs() if c != cmd]
+    _set_user_favs(cmds)
+    return jsonify({"success": True, "commands": cmds})
+
 # ─── 备份 ────────────────────────
 
 @bp.route("/backups")

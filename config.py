@@ -33,3 +33,6 @@ class Config:
     TOOLDELTA_CLASSIC_PLUGIN_PATH = os.path.join(TOOLDELTA_DIR, "插件文件", "ToolDelta类式插件")
     TOOLDELTA_PLUGIN_CFG_DIR = os.path.join(TOOLDELTA_DIR, "插件配置文件")
     TOOLDELTA_PLUGIN_DATA_DIR = os.path.join(TOOLDELTA_DIR, "插件数据文件")
+
+    # Web 面板自身数据目录（收藏等用户数据），独立于 ToolDelta 安装目录
+    WEB_DATA_DIR = os.path.join(BASE_DIR, "data")
