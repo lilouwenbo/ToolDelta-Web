@@ -1,6 +1,8 @@
 import os
 import sys
 import re
+import pty
+import select
 import subprocess
 import threading
 import time
@@ -10,7 +12,12 @@ import zipfile
 from flask import current_app
 from app.log_service import log_service
 
-_MC_COLOR_RE = re.compile(r"§[0-9a-fklmnor]")
+# 匹配所有 Minecraft 颜色/格式控制序列(§ + 其后任意字符)。
+# 主程序部分输出(如 rich logging 路径未转换的 §S 删除线、扩展色 §g~§v 等)
+# 会以裸 §X 形式进入 Web 终端, 若不清理会残留成乱码。
+# 注意: 主程序通过 colormode_replace / rich 已把大部分 § 转成 ANSI,
+# 此处仅作兜底, 清除任何残留的 § 控制序列。
+_MC_COLOR_RE = re.compile(r"§.")
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 _ANSI_SEQ_RE = re.compile(r"\x1b\[([0-9;]*)m")
 # 匹配除 SGR 颜色序列(\x1b[...m)之外的所有 ANSI 控制序列(清屏/清行/光标移动等)，
@@ -37,6 +44,45 @@ _ANSI_COLORS = {
     "1;94": "#a29bfe", "1;95": "#fd79a8", "1;96": "#81ecec", "1;97": "#fff",
 }
 
+# Minecraft 格式码 -> 标准 ANSI 16 色(近似映射, 用于把残留 § 序列也上色)
+_MC_TO_ANSI = {
+    "0": "30", "1": "34", "2": "32", "3": "36", "4": "31", "5": "35", "6": "33",
+    "7": "37", "8": "90", "9": "94", "a": "92", "b": "96", "c": "91", "d": "95",
+    "e": "93", "f": "97",
+}
+
+def mc_to_ansi(text):
+    """把 Minecraft § 颜色/格式码转换为标准 ANSI SGR 序列,
+    便于 ansi_to_html 统一还原为彩色 HTML。主程序经 rich/colormode_replace
+    已把大部分 § 转成 ANSI, 但少数未被转换而残留的 § 序列(如 §S 删除线、
+    部分扩展色)经此处理后也能正确着色, 避免 Web 控制台出现裸 § 乱码。"""
+    out = []
+    i = 0
+    n = len(text)
+    while i < n:
+        if text[i] == "§" and i + 1 < n:
+            code = text[i + 1]
+            if code in _MC_TO_ANSI:
+                out.append("\x1b[" + _MC_TO_ANSI[code] + "m")
+            elif code == "r":
+                out.append("\x1b[0m")
+            elif code == "l":
+                out.append("\x1b[1m")
+            elif code == "u":
+                out.append("\x1b[4m")
+            elif code == "o":
+                out.append("\x1b[3m")
+            elif code == "k":
+                out.append("\x1b[8m")
+            elif code == "S":
+                out.append("\x1b[9m")
+            # 其余 §X(如扩展色 §g~§v) 视作控制码丢弃
+            i += 2
+            continue
+        out.append(text[i])
+        i += 1
+    return "".join(out)
+
 def strip_ansi(text):
     text = _MC_COLOR_RE.sub("", text)
     text = _ANSI_ESCAPE_RE.sub("", text)
@@ -44,7 +90,7 @@ def strip_ansi(text):
     return text
 
 def ansi_to_html(text):
-    text = _MC_COLOR_RE.sub("", text)
+    text = mc_to_ansi(text)
     # 先剥离 OSC/字符集/孤立 ESC(非 CSI 控制序列)，避免裸控制字符残留成乱码；
     # 再剥离 CSI 非颜色序列，保留 SGR(\x1b[...m) 供下方颜色转换。
     text = _ANSI_NON_CSI_RE.sub("", text)
@@ -132,6 +178,9 @@ class ToolDeltaManager:
         self.output_buffer = []
         self.output_raw_buffer = []
         self.MAX_BUFFER = 500
+        self.pty_master = None
+        self._encoding = "utf-8"
+        self._enc_detected = False
 
     def init_app(self, app):
         self.app = app
@@ -219,16 +268,40 @@ class ToolDeltaManager:
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 env = os.environ.copy()
                 env["PYTHONIOENCODING"] = "utf-8"
-                self.process = subprocess.Popen(
-                    [sys.executable, main_py, "-l", "1"],
-                    cwd=td_dir,
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    startupinfo=startupinfo,
-                    bufsize=0,
-                    env=env,
-                )
+                # 每次启动重置解码探测状态与 pty 句柄
+                self._encoding = "utf-8"
+                self._enc_detected = False
+                self.pty_master = None
+                if os.name != "nt":
+                    # Linux/macOS: 用伪终端(pty)作为子进程的 stdout/stderr。
+                    # 这样主程序里 rich/colorama 检测到自己连着终端(stdout.isatty()==True),
+                    # 就会输出 ANSI 彩色转义码, 从而修复 Web 控制台"彩色字体丢失"的问题。
+                    # stdin 仍走 PIPE(不接 pty), 避免终端回显把输入又打回控制台。
+                    master, slave = pty.openpty()
+                    self.pty_master = master
+                    self.process = subprocess.Popen(
+                        [sys.executable, main_py, "-l", "1"],
+                        cwd=td_dir,
+                        stdin=subprocess.PIPE,
+                        stdout=slave,
+                        stderr=slave,
+                        startupinfo=startupinfo,
+                        bufsize=0,
+                        env=env,
+                    )
+                    os.close(slave)  # 父进程关闭 slave 副本, 子进程已 dup2
+                else:
+                    # Windows 无 pty 模块, 回退 PIPE(彩色由主程序自身兜底, 此处不强制)
+                    self.process = subprocess.Popen(
+                        [sys.executable, main_py, "-l", "1"],
+                        cwd=td_dir,
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        startupinfo=startupinfo,
+                        bufsize=0,
+                        env=env,
+                    )
                 self.running = True
                 self._broadcast("system", "ToolDelta 进程已启动")
                 self.output_thread = threading.Thread(target=self._read_output, daemon=True)
@@ -257,6 +330,12 @@ class ToolDeltaManager:
                     pass
             self.running = False
             self.process = None
+            if self.pty_master is not None:
+                try:
+                    os.close(self.pty_master)
+                except Exception:
+                    pass
+                self.pty_master = None
             self._broadcast("system", "ToolDelta 进程已停止")
             return True
 
@@ -277,31 +356,52 @@ class ToolDeltaManager:
         return False
 
     def _read_output(self):
-        encoding = "utf-8"
-        detected = False
-        while self.running and self.process:
+        # 读取源: Linux/macOS 用 pty master 文件描述符; Windows 回退用 process.stdout
+        if self.pty_master is not None and self.pty_master >= 0:
+            read_fd = self.pty_master
+            use_fd = True
+        elif self.process and self.process.stdout:
+            read_fd = self.process.stdout
+            use_fd = False
+        else:
+            with self._lock:
+                self.running = False
+                self._broadcast("system", "ToolDelta 进程已退出")
+            return
+        buf = b""
+        while self.running and self.process and self.process.poll() is None:
             try:
-                raw = self.process.stdout.readline()
-                if not raw:
-                    break
-                if not detected:
-                    # 先尝试 utf-8 实时显示；遇到非 utf-8 字节再检测编码，
-                    # 兼顾实时性与中文(gbk等)正确解码，避免控制台开头乱码
-                    try:
-                        line = raw.decode("utf-8").rstrip("\r\n")
-                    except UnicodeDecodeError:
-                        encoding = detect_encoding(raw)
-                        detected = True
-                        line = raw.decode(encoding, errors="replace").rstrip("\r\n")
+                if use_fd:
+                    chunk = os.read(read_fd, 4096)
                 else:
-                    line = raw.decode(encoding, errors="replace").rstrip("\r\n")
-                self._emit_line(line)
-            except:
+                    chunk = read_fd.read(4096)
+            except (OSError, ValueError):
                 break
+            if not chunk:
+                break
+            buf += chunk
+            # pty/管道按 \n 切行(pty 行尾为 \r\n, 切 \n 后用 rstrip 去掉 \r)
+            while b"\n" in buf:
+                raw_line, buf = buf.split(b"\n", 1)
+                self._emit_line(self._decode_line(raw_line))
+        # flush 残留(进程已退出但缓冲区仍有数据)
+        if buf:
+            self._emit_line(self._decode_line(buf))
         with self._lock:
             self.running = False
             self._broadcast("system", "ToolDelta 进程已退出")
 
+    def _decode_line(self, raw):
+        # 先尝试 utf-8 实时显示；遇到非 utf-8 字节再检测编码，
+        # 兼顾实时性与中文(gbk等)正确解码，避免控制台开头乱码
+        if not self._enc_detected:
+            try:
+                return raw.decode("utf-8").rstrip("\r")
+            except UnicodeDecodeError:
+                self._encoding = detect_encoding(raw)
+                self._enc_detected = True
+                return raw.decode(self._encoding, errors="replace").rstrip("\r")
+        return raw.decode(self._encoding, errors="replace").rstrip("\r")
     def _emit_line(self, line):
         cleaned = strip_ansi(line)
         self.output_raw_buffer.append(line)
