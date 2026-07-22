@@ -123,6 +123,24 @@ class ToolDeltaManager:
     def init_app(self, app):
         self.app = app
 
+    def _is_valid_main(self, main_py):
+        """检查 main.py 是否真正可用：存在、非空、且语法可编译（仅编译不执行，避免副作用）。
+
+        这样即使 main.py 被意外清空/损坏（仅 isfile 为 True），也能被识别为无效，
+        从而触发自动重新解压出厂包恢复，而不是带着坏文件去启动导致控制台起不来。
+        """
+        if not os.path.isfile(main_py):
+            return False
+        try:
+            if os.path.getsize(main_py) == 0:
+                return False
+            import ast
+            with open(main_py, "r", encoding="utf-8", errors="replace") as f:
+                ast.parse(f.read())
+            return True
+        except Exception:
+            return False
+
     def _ensure_main_program(self):
         """确保主程序存在：首次启动且 TOOLDELTA_DIR 为空（没有 main.py）时，
         自动从出厂包(TOOLDELTA_SOURCE_ZIP)解压初始主程序到 TOOLDELTA_DIR。
@@ -131,7 +149,7 @@ class ToolDeltaManager:
         app = self.app
         td_dir = app.config["TOOLDELTA_DIR"]
         main_py = app.config["TOOLDELTA_MAIN"]
-        if os.path.isfile(main_py):
+        if self._is_valid_main(main_py):
             return True, "主程序已存在"
         zip_path = app.config.get("TOOLDELTA_SOURCE_ZIP")
         if not zip_path or not os.path.isfile(zip_path):
@@ -159,8 +177,8 @@ class ToolDeltaManager:
                             os.makedirs(parent, exist_ok=True)
                         with z.open(info) as src, open(dest, "wb") as dst:
                             shutil.copyfileobj(src, dst)
-            if not os.path.isfile(main_py):
-                return False, "解压完成但 main.py 未生成，请检查出厂包"
+            if not self._is_valid_main(main_py):
+                return False, "解压完成但 main.py 未生成或无效，请检查出厂包"
             return True, "已从出厂包解压主程序"
         except Exception as e:
             return False, f"解压出厂包失败: {e}"
