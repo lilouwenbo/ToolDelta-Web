@@ -41,3 +41,9 @@ tunnel_url.txt
 # ── 打包产物 ───────────────────────────
 *.zip
 !tooldelta_source/ToolDelta-main.zip
+
+# ── 构建存档（每次构建生成，不提交）──
+archives/
+
+# ── 自检结果产物（每次自检生成，不提交）──
+selfcheck_summary.txt

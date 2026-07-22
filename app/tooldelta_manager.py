@@ -89,6 +89,36 @@ def strip_ansi(text):
     text = _ANSI_NON_CSI_RE.sub("", text)
     return text
 
+def _xterm256_to_hex(n):
+    """xterm 256 色调色板: 0-15 基础色, 16-231 6x6x6 彩色立方体, 232-255 灰度。"""
+    if n < 0:
+        n = 0
+    elif n > 255:
+        n = 255
+    if n < 8:
+        return _BASE16.get(30 + n, "#000000")
+    if n < 16:
+        return _BASE16.get(90 + (n - 8), "#ffffff")
+    if n < 232:
+        n -= 16
+        levels = (0, 95, 135, 175, 215, 255)
+        r = levels[n // 36]
+        g = levels[(n // 6) % 6]
+        b = levels[n % 6]
+        return "#%02x%02x%02x" % (r, g, b)
+    v = 8 + (n - 232) * 10
+    return "#%02x%02x%02x" % (v, v, v)
+
+
+# SGR 代码 -> 16 色十六进制(基础前景 30-37 / 亮色前景 90-97;
+# 背景 40-47、100-107 复用对应前景色)。
+_BASE16 = {}
+for _c in range(30, 38):
+    _BASE16[_c] = _ANSI_COLORS.get("0;%d" % _c)
+for _c in range(90, 98):
+    _BASE16[_c] = _ANSI_COLORS.get("0;%d" % _c)
+
+
 def ansi_to_html(text):
     text = mc_to_ansi(text)
     # 先剥离 OSC/字符集/孤立 ESC(非 CSI 控制序列)，避免裸控制字符残留成乱码；
@@ -97,62 +127,114 @@ def ansi_to_html(text):
     text = _ANSI_NON_COLOR_RE.sub("", text)
     parts = _ANSI_SEQ_RE.split(text)
     html = ""
-    reset = True
     fg = None
+    bg = None
     bold = False
+    italic = False
+    underline = False
+    strike = False
     for i, part in enumerate(parts):
         if i % 2 == 0:
+            # 文本段：用当前样式(前景/背景/粗体/斜体/下划线/删除线)包裹
             if part:
-                if reset:
-                    html += "<span>" if fg else ""
+                style = ""
+                if bold:
+                    style += "font-weight:bold;"
+                if italic:
+                    style += "font-style:italic;"
+                if underline or strike:
+                    deco = []
+                    if underline:
+                        deco.append("underline")
+                    if strike:
+                        deco.append("line-through")
+                    style += "text-decoration:" + " ".join(deco) + ";"
+                if fg:
+                    style += "color:" + fg + ";"
+                if bg:
+                    style += "background-color:" + bg + ";"
+                if style:
+                    html += '<span style="' + style + '">' + escape_html(part) + "</span>"
+                else:
                     html += escape_html(part)
-                    if fg:
-                        html += "</span>"
-                    else:
-                        html = html.replace("<span>", "", 1) if html.endswith("<span>") else html
-                else:
-                    style = ""
-                    if bold:
-                        style += "font-weight:bold;"
-                    if fg:
-                        style += "color:" + fg + ";"
-                    if style:
-                        html += '<span style="' + style + '">' + escape_html(part) + "</span>"
-                    else:
-                        html += escape_html(part)
         else:
-            codes = part.split(";")
-            reset = True
-            fg = None
-            bold = False
-            for code in codes:
+            # SGR 控制序列：解析颜色/格式码。
+            # 关键修复：rich 在支持真彩的终端下输出 38;2;r;g;b(而非 16 色)，
+            # 旧逻辑 _ANSI_COLORS 只认 16 色导致绝大部分彩色日志丢失颜色。
+            # 此处完整支持 真彩(38;2)、256 色(38;5)、背景(48;...)、
+            # 下划线(4)/斜体(3)/删除线(9) 等格式码。
+            nums = part.split(";")
+            j = 0
+            while j < len(nums):
+                code = nums[j]
                 if not code:
+                    j += 1
                     continue
-                if code == "0":
-                    reset = True
-                    fg = None
-                    bold = False
-                elif code == "1":
+                try:
+                    ci = int(code)
+                except ValueError:
+                    j += 1
+                    continue
+                if ci == 0:
+                    fg = bg = None
+                    bold = italic = underline = strike = False
+                elif ci == 1:
                     bold = True
-                    reset = False
-                elif code in ("22", "21"):
+                elif ci in (2, 21, 22):
                     bold = False
-                elif code in ("39", "49"):
+                elif ci == 3:
+                    italic = True
+                elif ci == 23:
+                    italic = False
+                elif ci == 4:
+                    underline = True
+                elif ci == 24:
+                    underline = False
+                elif ci == 9:
+                    strike = True
+                elif ci == 29:
+                    strike = False
+                elif ci == 39:
                     fg = None
-                else:
-                    key = None
-                    if code in _ANSI_COLORS:
-                        key = code
-                    for k in _ANSI_COLORS:
-                        if k.endswith(";" + code) or k.startswith(code + ";"):
-                            if bold and not k.startswith("1;"):
-                                key = "1;" + code if k == "0;" + code else k
-                            else:
-                                key = k
-                            break
-                    if key and key in _ANSI_COLORS:
-                        fg = _ANSI_COLORS[key]
-                        reset = False
+                elif ci == 49:
+                    bg = None
+                elif ci == 38 and j + 1 < len(nums):
+                    mode = nums[j + 1]
+                    if mode == "2" and j + 4 < len(nums):
+                        try:
+                            fg = "#%02x%02x%02x" % (int(nums[j + 2]), int(nums[j + 3]), int(nums[j + 4]))
+                        except ValueError:
+                            pass
+                        j += 4
+                    elif mode == "5" and j + 2 < len(nums):
+                        try:
+                            fg = _xterm256_to_hex(int(nums[j + 2]))
+                        except ValueError:
+                            pass
+                        j += 2
+                elif ci == 48 and j + 1 < len(nums):
+                    mode = nums[j + 1]
+                    if mode == "2" and j + 4 < len(nums):
+                        try:
+                            bg = "#%02x%02x%02x" % (int(nums[j + 2]), int(nums[j + 3]), int(nums[j + 4]))
+                        except ValueError:
+                            pass
+                        j += 4
+                    elif mode == "5" and j + 2 < len(nums):
+                        try:
+                            bg = _xterm256_to_hex(int(nums[j + 2]))
+                        except ValueError:
+                            pass
+                        j += 2
+                elif 30 <= ci <= 37:
+                    fg = _BASE16.get(ci)
+                elif 90 <= ci <= 97:
+                    fg = _BASE16.get(ci)
+                elif 40 <= ci <= 47:
+                    bg = _BASE16.get(ci - 10)
+                elif 100 <= ci <= 107:
+                    bg = _BASE16.get(ci - 10)
+                j += 1
     return html
 
 def escape_html(text):
