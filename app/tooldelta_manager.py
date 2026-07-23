@@ -354,9 +354,17 @@ class ToolDeltaManager:
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 env = os.environ.copy()
                 env["PYTHONIOENCODING"] = "utf-8"
-                # 强制真彩环境，确保子进程(rich)输出 24-bit ANSI 真彩色（P2-6）
+                # 真彩环境：确保子进程(rich/colorama)尽量输出 24-bit ANSI 真彩色（P2-6）
                 env["COLORTERM"] = "truecolor"
                 env["TERM"] = "xterm-256color"
+                # 跨平台强制彩色：Web 侧子进程的 stdout 是管道/伪终端而非真实控制台，
+                # 多数库(rich/colorama/click)据此(非 TTY)会关闭彩色。用 FORCE_COLOR /
+                # CLICOLOR_FORCE 强制其输出 ANSI 转义，再由 Web 端 ansi_to_html 还原彩色 HTML。
+                env["FORCE_COLOR"] = "1"
+                env["CLICOLOR_FORCE"] = "1"
+                # Windows 管道下 Python stdout 默认块缓冲，会导致控制台输出严重延迟/不刷新，
+                # 强制无缓冲以保证实时性（Unix 走 pty 已是行缓冲，此项无害）。
+                env["PYTHONUNBUFFERED"] = "1"
                 # 每次启动重置解码探测状态与 pty 句柄
                 self._encoding = "utf-8"
                 self._enc_detected = False
@@ -380,7 +388,9 @@ class ToolDeltaManager:
                     )
                     os.close(slave)  # 父进程关闭 slave 副本, 子进程已 dup2
                 else:
-                    # Windows 无 pty 模块, 回退 PIPE(彩色由主程序自身兜底, 此处不强制)
+                    # Windows 无 pty 模块, 回退 PIPE。自适配策略：Unix 用真实伪终端让子进程
+                    # 检测到 TTY 而输出 ANSI；Windows 无 pty，改为用 FORCE_COLOR/CLICOLOR_FORCE
+                    # 环境强制子进程在管道下仍输出 ANSI 真彩转义，Web 端再转成彩色 HTML。
                     self.process = subprocess.Popen(
                         [sys.executable, main_py, "-l", "1"],
                         cwd=td_dir,

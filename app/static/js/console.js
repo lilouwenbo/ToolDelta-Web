@@ -85,7 +85,7 @@ if (body) {
             body.innerHTML = '';
             if (d.lines && d.lines.length) d.lines.forEach(appendLine);
         })
-        .catch(function () { body.innerHTML = '<div style="color:#e74c3c;">获取历史输出失败</div>'; });
+        .catch(function () { body.innerHTML = '<div class="c-err">获取历史输出失败</div>'; });
 }
 
 // 拉取统一命令库用于 Tab 补全（静态扫描 + 运行时注册）
@@ -106,7 +106,7 @@ fetch('/api/commands')
     .catch(function () { cmdLibrary = []; });
 
 socket.on('connect', function () { if (statusEl) statusEl.textContent = '已连接'; });
-socket.on('disconnect', function (f ) statusEl.textContent = '已断开'; });
+socket.on('disconnect', function (f (statusEl) statusEl.textContent = '已断开'; });
 socket.on('console_output', function (data) { appendLine(data.data_html || data.data || ''); });
 
 if (input) {
