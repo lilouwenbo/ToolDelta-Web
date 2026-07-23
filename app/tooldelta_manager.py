@@ -1,7 +1,11 @@
 import os
 import sys
 import re
-import pty
+# Windows 没有 pty 模块：pty 仅用于类 Unix 平台给子进程套伪终端以输出 ANSI 真彩，
+# 故仅在非 Windows 平台导入；Windows 走 PIPE 回退（彩色由主程序自身兜底）。
+# 注意：import 必须条件化，否则 Windows 上模块加载即因 ImportError 整体崩溃、无法启动。
+if os.name != "nt":
+    import pty
 import select
 import subprocess
 import threading

@@ -30,6 +30,17 @@
   --r-md: 8px;
   --r-lg: 12px;
   --r-xl: 16px;
+
+  /* 控制台专用配色：服务器下发的 ANSI 调色板面向深色背景设计（含黑/灰/白前景），
+     故控制台在深、浅主题下均保持深色，切换主题不会出现配色错乱或文字不可读 */
+  --console-bg: #0a0b0d;
+  --console-bar: #111316;
+  --console-foot: #0a0b0d;
+  --console-fg: #d0d6e0;
+  --c-cmd: #4caf70;
+  --c-hint: #8a8f98;
+  --c-loading: #7a8190;
+  --c-err: #e5484d;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -693,3 +704,9 @@ body.theme-light textarea,
 body.theme-light select { box-shadow: none; }
 body.theme-light .card,
 body.theme-light .console-wrap { box-shadow: 0 1px 3px rgba(20, 30, 60, 0.08); }
+
+/* 控制台 JS 注入文本的主题化配色：跟随 --console-* 变量，深/浅主题下均清晰可读 */
+.c-cmd { color: var(--c-cmd); }
+.c-hint { color: var(--c-hint); }
+.c-loading { color: var(--c-loading); }
+.c-err { color: var(--c-err); }

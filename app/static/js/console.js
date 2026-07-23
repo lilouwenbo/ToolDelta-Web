@@ -33,7 +33,7 @@ function appendLine(html) {
 function sendCommand(cmd) {
     cmd = (cmd || '').trim();
     if (!cmd) return;
-    appendLine('<span style="color:#8f8;">$ ' + cmd.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span>');
+    appendLine('<span class="c-cmd">$ ' + cmd.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span>');
     socket.emit('console_command', cmd);
     saveHistory(cmd);
 }
@@ -76,7 +76,7 @@ function complete() {
     moveCursorEnd(input);
 }
 
-if (body) body.innerHTML = '<div style="color:#666;">正在加载输出...</div>';
+if (body) body.innerHTML = '<div class="c-loading">正在加载输出...</div>';
 
 if (body) {
     fetch('/api/tool/output?tail=200&html=1')
@@ -106,7 +106,7 @@ fetch('/api/commands')
     .catch(function () { cmdLibrary = []; });
 
 socket.on('connect', function () { if (statusEl) statusEl.textContent = '已连接'; });
-socket.on('disconnect', function () { if (statusEl) statusEl.textContent = '已断开'; });
+socket.on('disconnect', function (f ) statusEl.textContent = '已断开'; });
 socket.on('console_output', function (data) { appendLine(data.data_html || data.data || ''); });
 
 if (input) {
