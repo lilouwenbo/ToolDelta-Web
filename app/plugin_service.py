@@ -4,6 +4,8 @@ import shutil
 import zipfile
 import re
 from pathlib import Path
+from urllib.parse import urlparse
+from werkzeug.utils import secure_filename
 from flask import current_app
 from app.market_service import market_service
 
@@ -168,13 +170,25 @@ class PluginService:
     def upload_data_file(self, name, file):
         data_dir = os.path.join(self.get_data_path(), name)
         os.makedirs(data_dir, exist_ok=True)
-        path = os.path.join(data_dir, file.filename)
+        fname = secure_filename(file.filename)
+        if not fname:
+            return False
+        path = os.path.join(data_dir, fname)
+        # 兜底校验落点在 data_dir 内，防止文件名遍历写越权（P0-2）
+        if not os.path.abspath(path).startswith(os.path.abspath(data_dir) + os.sep):
+            return False
         file.save(path)
         return True
 
     def delete_data_file(self, name, filename):
         data_dir = os.path.join(self.get_data_path(), name)
-        path = os.path.join(data_dir, filename)
+        fname = secure_filename(filename)
+        if not fname:
+            return False
+        path = os.path.join(data_dir, fname)
+        # 净化 + 前缀校验，防止删除任意文件（P0-4）
+        if not os.path.abspath(path).startswith(os.path.abspath(data_dir) + os.sep):
+            return False
         if os.path.isfile(path):
             os.remove(path)
             return True
@@ -183,7 +197,13 @@ class PluginService:
     def upload_config_file(self, name, file):
         cfg_dir = self.get_cfg_path()
         os.makedirs(cfg_dir, exist_ok=True)
-        path = os.path.join(cfg_dir, file.filename)
+        fname = secure_filename(file.filename)
+        if not fname:
+            return False
+        path = os.path.join(cfg_dir, fname)
+        # 兜底校验落点在 cfg_dir 内，防止文件名遍历写越权（P0-3）
+        if not os.path.abspath(path).startswith(os.path.abspath(cfg_dir) + os.sep):
+            return False
         file.save(path)
         return True
 
@@ -217,10 +237,16 @@ class PluginService:
         try:
             import requests
             base = market_url.rstrip("/")
+            # SSRF 防护：仅允许 http/https 协议的市场源（P1-5）
+            parsed = urlparse(base)
+            if parsed.scheme not in ("http", "https"):
+                return False, "不支持的市场源协议"
             pmap = requests.get(f"{base}/plugin_ids_map.json", timeout=10).json()
             if plugin_id not in pmap:
                 return False, "插件 ID 不在该市场源中"
-            plugin_name = pmap[plugin_id]
+            plugin_name = secure_filename(pmap[plugin_id])
+            if not plugin_name:
+                return False, "插件名不合法"
             pdata = requests.get(f"{base}/{plugin_name}/datas.json", timeout=10).json()
             tree = requests.get(f"{base}/directory_tree.json", timeout=10).json()
             ftree = tree.get(plugin_name)
@@ -232,8 +258,14 @@ class PluginService:
             files_to_download = []
             self._unfold_dict(ftree, plugin_name, files_to_download)
             for filepath in files_to_download:
+                # 净化每个文件路径，禁止 "../" 等越权写（P1-5）
+                rel = os.path.normpath(filepath).lstrip("/\\")
+                if os.path.isabs(filepath) or ".." in rel.split(os.sep):
+                    continue
                 url = f"{base}/{plugin_name}/{filepath}"
-                local = os.path.join(target, filepath)
+                local = os.path.join(target, rel)
+                if not os.path.abspath(local).startswith(os.path.abspath(target) + os.sep):
+                    continue
                 os.makedirs(os.path.dirname(local), exist_ok=True)
                 resp = requests.get(url, timeout=30)
                 with open(local, "wb") as f:

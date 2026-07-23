@@ -350,6 +350,9 @@ class ToolDeltaManager:
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 env = os.environ.copy()
                 env["PYTHONIOENCODING"] = "utf-8"
+                # 强制真彩环境，确保子进程(rich)输出 24-bit ANSI 真彩色（P2-6）
+                env["COLORTERM"] = "truecolor"
+                env["TERM"] = "xterm-256color"
                 # 每次启动重置解码探测状态与 pty 句柄
                 self._encoding = "utf-8"
                 self._enc_detected = False
@@ -394,32 +397,39 @@ class ToolDeltaManager:
                 return False
 
     def stop(self):
+        proc = None
+        pty = None
         with self._lock:
             if not self.running or not self.process:
                 return True
-            try:
-                if self.process.stdin:
-                    self.process.stdin.close()
-            except:
-                pass
-            try:
-                self.process.terminate()
-                self.process.wait(timeout=5)
-            except:
-                try:
-                    self.process.kill()
-                except:
-                    pass
+            proc = self.process
             self.running = False
             self.process = None
-            if self.pty_master is not None:
+            pty = self.pty_master
+        # 在锁外等待进程退出，避免持锁阻塞其他调用（如 send_command）最长 5 秒（P2-4）
+        try:
+            if proc.stdin:
                 try:
-                    os.close(self.pty_master)
+                    proc.stdin.close()
                 except Exception:
                     pass
-                self.pty_master = None
-            self._broadcast("system", "ToolDelta 进程已停止")
-            return True
+            try:
+                proc.terminate()
+                proc.wait(timeout=5)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+        finally:
+            if pty is not None:
+                try:
+                    os.close(pty)
+                except Exception:
+                    pass
+        self.pty_master = None
+        self._broadcast("system", "ToolDelta 进程已停止")
+        return True
 
     def restart(self):
         self.stop()

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """ToolDelta-Web 规范自检入口（默认 10 轮）。
 
-每轮：独立子进程 + 全新隔离环境运行 run_full_test.py（约 90 项断言），
+每轮：独立子进程 + 全新隔离环境运行 run_full_test.py（138 项断言），
 循环 ROUND_COUNT 次后输出汇总并写入 selfcheck_summary.txt。
 
 用法:
@@ -21,10 +21,22 @@ for i in range(1, ROUND_COUNT + 1):
     print(f"{'='*60}\n")
 
     start = time.time()
-    proc = subprocess.run(
-        [sys.executable, TEST_SCRIPT],
-        capture_output=True, text=True, timeout=300
-    )
+    try:
+        proc = subprocess.run(
+            [sys.executable, TEST_SCRIPT],
+            capture_output=True, text=True, timeout=300
+        )
+    except subprocess.TimeoutExpired:
+        # 单轮超时（>300s）不应让整个自检脚本崩溃，标记该轮失败并继续（P2-2）
+        elapsed = time.time() - start
+        all_rounds.append({
+            "round": i, "passed": -1, "failed": -1, "total": -1,
+            "pass_lines": 0, "elapsed": elapsed,
+            "fail_items": ["测试脚本超时（>300s），本轮标记为失败"],
+            "success": False,
+        })
+        print(f"  本轮结果: 超时（>300s）  ✗ 超时  | 耗时 {elapsed:.1f}s")
+        continue
     elapsed = time.time() - start
 
     output = proc.stdout

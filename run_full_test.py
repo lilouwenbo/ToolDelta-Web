@@ -326,7 +326,9 @@ rec("空body backup/create 不500", r.status_code != 500, "status=%d" % r.status
 # ============ N. WebSocket ============
 print("\n== N. WebSocket 事件 ==")
 try:
-    sio = socketio.test_client(app)
+    # 使用已登录的 flask 测试客户端（携带认证会话）建立 WebSocket，
+    # 以通过 handle_connect 的鉴权门禁，同时验证已认证连接可正常收发
+    sio = socketio.test_client(app, flask_test_client=client)
     sio.emit("console_command", "help")
     sio.disconnect()
     rec("WebSocket connect/console_command/disconnect", True)

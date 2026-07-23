@@ -227,6 +227,13 @@ class WatchdogService:
         if status.get("running"):
             with self._lock:
                 self._runtime["healthy"] = True
+                # 已稳定运行一段时间则清零重启计数，使 max_restarts 成为
+                # 「滑动窗口内」的上限而非终身上限（P2-1）
+                last = self._runtime.get("last_restart")
+                if self._runtime["restarts_count"] > 0 and (
+                    last is None or self._seconds_diff(last, now) > 600
+                ):
+                    self._runtime["restarts_count"] = 0
             return
 
         # 进程未运行

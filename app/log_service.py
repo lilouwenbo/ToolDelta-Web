@@ -3,6 +3,9 @@ import re
 from datetime import datetime
 
 class LogService:
+    # 内存中当日日志行数上限，超出滚动截断，防止长期运行内存泄漏（P1-4）
+    MAX_LOG_LINES = 5000
+
     def __init__(self):
         self._logs_dir = None
         self._today = None
@@ -29,6 +32,8 @@ class LogService:
         if os.path.isfile(path):
             with open(path, "r", encoding="utf-8") as f:
                 self._today_lines = [l.rstrip("\r\n") for l in f.readlines()]
+            if len(self._today_lines) > self.MAX_LOG_LINES:
+                self._today_lines = self._today_lines[-self.MAX_LOG_LINES:]
 
     def _today_path(self):
         return os.path.join(self._logs_dir, self._today + ".log") if self._logs_dir else None
@@ -39,6 +44,8 @@ class LogService:
         line = f"[{ts}][{level}][{source}] {message}"
         with self._lock:
             self._today_lines.append(line)
+            if len(self._today_lines) > self.MAX_LOG_LINES:
+                self._today_lines = self._today_lines[-self.MAX_LOG_LINES:]
             path = self._today_path()
             if path:
                 try:

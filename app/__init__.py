@@ -82,4 +82,13 @@ def create_app():
     def inject_wallpaper():
         return {"wallpaper_url": wp_svc.get_wallpaper()}
 
+    @app.context_processor
+    def inject_versions():
+        # 注入三版本信息供设置页等模板展示（P2-5）
+        try:
+            from app.dashboard_service import dashboard_service
+            return {"versions": dashboard_service.get_version_info()}
+        except Exception:
+            return {"versions": {"web_version": "1.0", "build_hash": "nogit", "tooldelta_version": "—"}}
+
     return app

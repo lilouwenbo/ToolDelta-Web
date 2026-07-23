@@ -45,8 +45,8 @@ def _write_locked(users):
     os.replace(tmp, USER_FILE)
 
 def validate_password(password):
-    if len(password) < 1 or len(password) > 64:
-        return False, "密码长度需1-64位"
+    if not isinstance(password, str) or len(password) < 8 or len(password) > 64:
+        return False, "密码长度需8-64位"
     return True, ""
 
 def is_configured():

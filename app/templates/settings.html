@@ -19,6 +19,15 @@
     </div>
 
     <div class="card" style="margin-bottom:20px">
+        <h2 style="font-size:16px;font-weight:600;margin-bottom:16px">版本信息</h2>
+        <div style="font-size:13px;color:var(--ink-muted);line-height:1.9">
+            <div>Web 面板版本：<span style="color:var(--ink)">{{ versions.web_version }}</span></div>
+            <div>ToolDelta 版本：<span style="color:var(--ink)">{{ versions.tooldelta_version }}</span></div>
+            <div>构建哈希：<span style="color:var(--ink)">{{ versions.build_hash }}</span></div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
         <h2 style="font-size:16px;font-weight:600;margin-bottom:16px">修改密码</h2>
         <div class="form-group" style="margin-bottom:12px">
             <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:var(--ink-muted)">当前密码</label>

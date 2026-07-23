@@ -11,7 +11,9 @@ get_dashboard() 既可被 /api/dashboard 路由调用，也可被测试直接调
 """
 import os
 import time
+import json
 import shutil
+import subprocess
 
 from app.tooldelta_manager import tooldelta_manager
 from app.plugin_service import plugin_service
@@ -24,6 +26,7 @@ class DashboardService:
     def __init__(self):
         self.version = "1.0"
         self.app = None
+        self._build_hash_cache = None
 
     # ─── 初始化 ───────────────────────────────────────────────
 
@@ -31,7 +34,76 @@ class DashboardService:
         """保存应用快照（基准目录 / 版本），并兜底注册仪表盘蓝图（幂等）。"""
         self.app = app
         # 快照版本号（风格B：纯只读聚合，不依赖后台线程）
-        self.version = "1.0"
+        self.version = self._read_version()
+
+    @staticmethod
+    def _read_version():
+        """从项目根目录 VERSION 文件读取 Web 面板版本号（P2-5）。"""
+        try:
+            here = os.path.dirname(os.path.abspath(__file__))
+            vf = os.path.join(os.path.dirname(here), "VERSION")
+            if os.path.isfile(vf):
+                with open(vf, "r", encoding="utf-8") as f:
+                    v = f.read().strip()
+                    if v:
+                        return v
+        except Exception:
+            pass
+        return "1.0"
+
+    def get_version_info(self):
+        """返回三版本信息，供 /api/version 与设置页展示（P2-5）。"""
+        return {
+            "web_version": self.version or "1.0",
+            "build_hash": self._get_build_hash(),
+            "tooldelta_version": self._get_tooldelta_version(),
+        }
+
+    def _get_build_hash(self):
+        """构建哈希：优先读 build_info.json，否则实时取 git 短哈希（进程内缓存）。"""
+        if self._build_hash_cache is not None:
+            return self._build_hash_cache
+        result = "nogit"
+        try:
+            here = os.path.dirname(os.path.abspath(__file__))
+            root = os.path.dirname(here)
+            bi = os.path.join(root, "build_info.json")
+            if os.path.isfile(bi):
+                try:
+                    with open(bi, "r", encoding="utf-8") as f:
+                        d = json.load(f)
+                    if d.get("git"):
+                        result = d["git"]
+                        self._build_hash_cache = result
+                        return result
+                except Exception:
+                    pass
+            out = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=root, capture_output=True, text=True, timeout=10,
+            )
+            if out.returncode == 0 and out.stdout.strip():
+                result = out.stdout.strip()
+        except Exception:
+            pass
+        self._build_hash_cache = result
+        return result
+
+    @staticmethod
+    def _get_tooldelta_version():
+        """尝试从 ToolDelta 安装目录读取版本（若存在 version.txt）。"""
+        try:
+            from flask import current_app
+            td_dir = current_app.config.get("TOOLDELTA_DIR")
+            if not td_dir:
+                return "—"
+            vf = os.path.join(td_dir, "version.txt")
+            if os.path.isfile(vf):
+                with open(vf, "r", encoding="utf-8") as f:
+                    return f.read().strip() or "—"
+        except Exception:
+            pass
+        return "—"
 
         try:
             log_service.info("状态仪表盘服务已初始化", "DASHBOARD")

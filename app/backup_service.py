@@ -77,6 +77,12 @@ class BackupService:
 
     def restore_backup(self, zip_name):
         backup_dir = self.get_backup_dir()
+        # 先停止 ToolDelta 进程，避免运行期覆盖文件导致主程序损坏（P1-3）
+        try:
+            from app.tooldelta_manager import tooldelta_manager
+            tooldelta_manager.stop()
+        except Exception:
+            pass
         td_dir = current_app.config["TOOLDELTA_DIR"]
         zip_path = os.path.join(backup_dir, zip_name)
         if not os.path.isfile(zip_path):
@@ -143,6 +149,12 @@ class BackupService:
           确保 main.py 落在 TOOLDELTA_DIR 下，而不会出现 TOOLDELTA_DIR/ToolDelta-main/ 的嵌套。
         """
         td_dir = current_app.config["TOOLDELTA_DIR"]
+        # 先停止 ToolDelta 进程，避免运行期删文件破坏数据（P1-3）
+        try:
+            from app.tooldelta_manager import tooldelta_manager
+            tooldelta_manager.stop()
+        except Exception:
+            pass
         zip_path = current_app.config.get("TOOLDELTA_SOURCE_ZIP")
         if not zip_path or not os.path.isfile(zip_path):
             return False, "出厂程序包不存在，无法进行重置"

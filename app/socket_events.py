@@ -8,7 +8,12 @@ def init_socketio(socketio):
 
     @socketio.on("connect")
     def handle_connect():
-        pass
+        # 鉴权：未登录的 WebSocket 连接直接断开，防止未授权访问控制台（P2-3）
+        # fail-closed：会话校验异常（含未登录）一律拒绝连接，避免误放行
+        from flask import session
+        from flask_socketio import disconnect
+        if not session.get("authenticated"):
+            disconnect()
 
     @socketio.on("console_command")
     def handle_command(data):

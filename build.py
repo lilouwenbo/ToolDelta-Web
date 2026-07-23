@@ -35,6 +35,7 @@ EXCLUDE_DIRS = {
 EXCLUDE_FILES = {
     "ToolDelta-Web.zip",  # 旧的「最新交付物」不要打回包里
     "selfcheck_summary.txt",  # 自检结果产物不进包
+    "build_info.json",  # 构建元数据，不进包
 }
 EXCLUDE_SUFFIXES = (".pyc", ".pyo", ".log", ".db", ".sqlite3")
 
@@ -150,6 +151,19 @@ def main():
     with open(MANIFEST, "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
     print("已记录构建档案到 archives/manifest.json")
+
+    # 写构建信息文件（供 /api/version 在运行时读取准确的构建哈希，P2-5）
+    try:
+        with open(os.path.join(ROOT, "build_info.json"), "w", encoding="utf-8") as f:
+            json.dump({
+                "version": version,
+                "built_at": stamp,
+                "git": git_hash,
+                "file": archive_name,
+                "sha256": digest,
+            }, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
     print("\n构建摘要:")
     print("  版本   :", version)

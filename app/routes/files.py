@@ -2,6 +2,7 @@ import os
 import shutil
 import mimetypes
 from flask import Blueprint, request, jsonify, send_file, session, after_this_request
+from werkzeug.utils import secure_filename
 from app.log_service import log_service
 from config import Config
 
@@ -26,8 +27,10 @@ def fail(msg):
 def safe_path(path_str):
     if not path_str:
         return ALLOWED_ROOT
+    # 先归一化，再校验「必须等于根目录或以根目录 + 路径分隔符开头」，
+    # 避免 ../../ToolDeltaX 这类同级兄弟目录越权访问（P1-1）。
     full = os.path.normpath(os.path.join(ALLOWED_ROOT, path_str.lstrip("/\\")))
-    if not full.startswith(ALLOWED_ROOT):
+    if full != ALLOWED_ROOT and not full.startswith(ALLOWED_ROOT + os.sep):
         return None
     return full
 
@@ -86,7 +89,7 @@ def save_file():
     full = safe_path(raw)
     if not full:
         return fail("路径不允许")
-    if not full.startswith(ALLOWED_ROOT):
+    if full != ALLOWED_ROOT and not full.startswith(ALLOWED_ROOT + os.sep):
         return fail("路径不允许")
     try:
         with open(full, "w", encoding="utf-8") as f:
@@ -107,7 +110,14 @@ def upload_file():
     f = request.files["file"]
     if not f.filename:
         return fail("文件名为空")
-    dest = os.path.join(full, f.filename)
+    # 净化文件名：去除路径分隔符与 ".."，防止上传路径遍历任意写（P0-1）
+    fname = secure_filename(f.filename)
+    if not fname:
+        return fail("文件名不合法")
+    dest = os.path.join(full, fname)
+    # 兜底：确认最终落点仍在上传目录内
+    if os.path.abspath(dest) != os.path.abspath(full) and not os.path.abspath(dest).startswith(os.path.abspath(full) + os.sep):
+        return fail("路径不允许")
     try:
         f.save(dest)
         audit("上传文件", f"路径={os.path.join(raw, f.filename)}")

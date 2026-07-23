@@ -1,6 +1,26 @@
 import os
+import secrets
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _load_or_create_secret_key():
+    """加载或生成持久化 SECRET_KEY（instance/secret_key），避免会话被伪造（P1-2）。"""
+    key_file = os.path.join(BASE_DIR, "instance", "secret_key")
+    try:
+        if os.path.isfile(key_file):
+            with open(key_file, "r", encoding="utf-8") as f:
+                k = f.read().strip()
+                if k:
+                    return k
+        os.makedirs(os.path.dirname(key_file), exist_ok=True)
+        k = secrets.token_hex(32)
+        with open(key_file, "w", encoding="utf-8") as f:
+            f.write(k)
+        return k
+    except Exception:
+        # 极端场景（如只读文件系统）退化为内存随机值，绝不阻塞启动
+        return secrets.token_hex(32)
 
 
 def _env_bool(name, default=False):
@@ -8,8 +28,11 @@ def _env_bool(name, default=False):
 
 
 class Config:
-    # 安全相关保持原样（不在此处做安全加固，仅保证可用）
-    SECRET_KEY = os.environ.get("SECRET_KEY", "tooldelta-web-secret-key")
+    # SECRET_KEY 安全加固（P1-2）：
+    # 1) 优先读环境变量 SECRET_KEY（生产必须显式设置）；
+    # 2) 否则读 instance/secret_key（首次运行自动生成并持久化），保证重启后密钥稳定；
+    # 3) 都不存在则回退内存随机值（仅本进程有效，重启即失效）。
+    SECRET_KEY = os.environ.get("SECRET_KEY") or _load_or_create_secret_key()
 
     HOST = os.environ.get("HOST", "0.0.0.0")
     PORT = int(os.environ.get("PORT", "5000"))
