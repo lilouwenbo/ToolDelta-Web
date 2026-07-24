@@ -4,16 +4,75 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
     <meta name="theme-color" content="#0f1011">
+    <meta name="color-scheme" content="light dark">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>ToolDelta Web 管理面板</title>
     <link rel="stylesheet" href="/static/css/style.css">
-</head>
-<body>
     <script>
-      (function(){ if (localStorage.getItem('td_theme') === 'light') document.body.classList.add('theme-light'); })();
-      function toggleTheme(){ var light = document.body.classList.toggle('theme-light'); localStorage.setItem('td_theme', light ? 'light' : 'dark'); var b=document.querySelector('.theme-toggle'); if(b){ b.setAttribute('aria-pressed', light ? 'true' : 'false'); } }
+      /* ── 多主题系统：pre-paint 防 FOUC（参考 opaque/harryheman 最佳实践） ──
+         支持 dark / light / system 三态，data-theme 属性挂在 <html> 上。
+         pre-paint 在 CSS 渲染前执行，避免深色→浅色闪烁。
+         跨 tab 同步：storage 事件广播到其他 tab 立即生效。 */
+      (function(){
+        var KEY = 'td_theme_v2';
+        var stored = 'dark';
+        try { stored = localStorage.getItem(KEY) || 'dark'; } catch(e) {}
+        // 兼容旧键 td_theme（迁移）
+        if (stored === 'dark') {
+          try {
+            var old = localStorage.getItem('td_theme');
+            if (old === 'light') { stored = 'light'; localStorage.setItem(KEY, 'light'); }
+          } catch(e) {}
+        }
+        if (stored !== 'dark' && stored !== 'light' && stored !== 'system') stored = 'dark';
+        function applyTheme(mode){
+          var actual = mode;
+          if (mode === 'system') {
+            actual = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+          }
+          document.documentElement.setAttribute('data-theme', actual);
+          document.documentElement.style.setProperty('color-scheme', actual);
+          // theme-color 跟随：移动端浏览器顶栏配色
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', actual === 'light' ? '#eef1f6' : '#0f1011');
+        }
+        applyTheme(stored);
+        // 系统主题变化时若用户选 system 则跟随
+        if (window.matchMedia) {
+          window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(){
+            if ((localStorage.getItem(KEY) || 'dark') === 'system') applyTheme('system');
+          });
+        }
+        // 暴露给后续脚本：返回存储的 mode（不是 actual）
+        window._tdThemeMode = stored;
+        window._tdApplyTheme = applyTheme;
+        // 跨 tab 同步
+        window.addEventListener('storage', function(e){
+          if (e.key === KEY && e.newValue) applyTheme(e.newValue);
+        });
+      })();
+      function setTheme(mode){
+        if (mode !== 'dark' && mode !== 'light' && mode !== 'system') return;
+        try { localStorage.setItem('td_theme_v2', mode); } catch(e) {}
+        if (window._tdApplyTheme) window._tdApplyTheme(mode);
+        // 更新切换器 aria-pressed / aria-label
+        var b = document.querySelector('.theme-toggle');
+        if (b) {
+          var labels = { dark: '切换到浅色主题', light: '切换到跟随系统', system: '切换到深色主题' };
+          b.setAttribute('aria-label', labels[mode] || '切换主题');
+          b.setAttribute('data-current', mode);
+        }
+      }
+      function toggleTheme(){
+        var cur = (document.documentElement.getAttribute('data-theme') || 'dark');
+        var stored = 'dark';
+        try { stored = localStorage.getItem('td_theme_v2') || 'dark'; } catch(e) {}
+        // 循环：dark → light → system → dark
+        var next = stored === 'dark' ? 'light' : (stored === 'light' ? 'system' : 'dark');
+        setTheme(next);
+      }
       function toggleSidebar(){
           var open = document.body.classList.toggle('sidebar-open');
           var b=document.querySelector('.sidebar-toggle-btn');
@@ -119,7 +178,19 @@
             <a href="/settings" class="nav-separator {% if active_page == 'settings' %}active{% endif %}" {% if active_page == 'settings' %}aria-current="page"{% endif %}><span class="nav-ico" aria-hidden="true">🎛️</span>面板设置</a>
         </nav>
         <div class="sidebar-footer">
-            <button class="theme-toggle" onclick="toggleTheme()" title="切换深色 / 浅色主题" aria-pressed="false">🌗 主题</button>
+            <button class="theme-toggle" onclick="toggleTheme()" title="切换主题（深色 / 浅色 / 跟随系统）" aria-label="切换主题">
+              <span class="theme-icon" aria-hidden="true"></span><span class="theme-label">主题</span>
+            </button>
+            <script>
+              // 初始化切换器 data-current（DOMContentLoaded 前可能已渲染，用脚本立即补齐）
+              (function(){
+                var b = document.querySelector('.theme-toggle');
+                if (!b) return;
+                var stored = 'dark';
+                try { stored = localStorage.getItem('td_theme_v2') || 'dark'; } catch(e) {}
+                b.setAttribute('data-current', stored);
+              })();
+            </script>
             <div class="user-box">
                 <span class="user-name">{{ session.get('username','?') }}</span>
                 <a href="/logout" class="logout-link">退出</a>

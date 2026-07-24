@@ -370,6 +370,26 @@ window.TDPoll = (function(){
     };
 })();
 
+// ─── 全局错误捕获：未处理异常与 Promise 拒收 ───
+// 参考 GitHub Sentry/生产级 web 应用最佳实践：
+// 静默失败让用户困惑，捕获后给出友好提示并保留控制台原始错误便于调试。
+window.addEventListener('error', function(e) {
+    // 忽略资源加载错误（由 onload/onerror 各自处理），只捕获 JS 运行时错误
+    if (!e || !e.message) return;
+    try { console.error('[TD Uncaught]', e.message, e.error); } catch(_) {}
+    // 避免循环报错：showToast 内部异常不再触发 toast
+    try { showToast('发生未知错误，请刷新页面重试', 'error'); } catch(_) {}
+});
+window.addEventListener('unhandledrejection', function(e) {
+    var reason = e && e.reason;
+    var msg = (reason && (reason.message || reason.userMessage)) || 'Promise 未捕获拒绝';
+    try { console.error('[TD UnhandledRejection]', reason); } catch(_) {}
+    // 用户级错误（tdFetch 包装的 userMessage）才提示，技术性拒绝静默
+    if (reason && reason.userMessage) {
+        try { showToast(reason.userMessage, 'error'); } catch(_) {}
+    }
+});
+
 // ─── 状态轮询 ───
 // 统一使用 TDPoll：页面隐藏时自动暂停（省电），可见时恢复；
 // 仅当页面存在状态指示元素时才注册，避免在 settings 等页面空跑。

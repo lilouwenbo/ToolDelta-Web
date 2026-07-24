@@ -300,6 +300,8 @@ pre { white-space: pre-wrap; word-break: break-all; }
   padding: 24px;
   text-align: left;
   transition: border-color 0.15s;
+  /* CSS containment：隔离 stat-card 重排，dashboard 轮询更新时不影响其他卡片 */
+  contain: layout style paint;
 }
 .stat-card:hover { border-color: var(--hairline-strong); }
 .stat-card .stat-header {
@@ -371,7 +373,8 @@ a.btn { color: inherit; }
 /* ─── Console ─── */
 
 .console-wrap {
-  background: #000;
+  /* 控制台背景用 --console-bg 变量，深浅主题下均保持深色（ANSI 配色设计） */
+  background: var(--console-bg);
   border: 1px solid var(--hairline);
   border-radius: var(--r-lg);
   overflow: hidden;
@@ -500,6 +503,8 @@ tr:hover td { background: var(--surface-2); }
   border-radius: var(--r-lg);
   padding: 20px;
   transition: all 0.15s;
+  /* CSS containment：隔离卡片重排，长列表滚动时提升性能（参考 web.dev 最佳实践） */
+  contain: layout style paint;
 }
 .plugin-card:hover { border-color: var(--hairline-strong); }
 .plugin-card .p-name { font-size: 15px; font-weight: 600; margin-bottom: 6px; color: var(--ink); }
@@ -980,11 +985,19 @@ body.kbd-open .modal .modal-actions {
   .card { padding: 12px; }
 }
 
-/* 安全区适配：刘海屏 / 全面屏顶部 status bar + 底部 home indicator */
+/* 安全区适配：刘海屏 / 全面屏顶部 status bar + 底部 home indicator + 横屏左右刘海 */
 @supports (padding: max(0px)) {
   .sidebar-footer { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
   .main-content { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
   .sidebar-toggle-btn { top: max(14px, env(safe-area-inset-top)); }
+  /* 横屏刘海机型：sidebar 左侧、main-content 右侧避开刘海 */
+  .sidebar { left: env(safe-area-inset-left); }
+  .main-content { padding-right: max(24px, env(safe-area-inset-right)); }
+  /* toast 两侧也避开横屏刘海 */
+  .toast-container {
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+  }
 }
 
 /* 移动端控制台输入框：禁用自动大写/自动纠正，提升命令输入体验 */
@@ -1054,8 +1067,20 @@ body.kbd-open .modal .modal-actions {
 .card { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); }
 .console-wrap { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); }
 
+/* ── 多主题系统（参考 Posisteve/opaque/harryheman GitHub 最佳实践） ──
+   data-theme 属性挂在 <html> 上（pre-paint script 设置），避免 body 加载延迟导致的 FOUC。
+   深色为默认（:root 已定义），浅色覆盖在 [data-theme="light"]。
+   "跟随系统"模式由 JS 在 pre-paint 时解析 prefers-color-scheme 决定 actual。 */
+
+/* 主题切换过渡：参考 2026 响应式最佳实践，0.2s 平滑过渡避免突兀闪烁。
+   仅过渡颜色与背景，不过渡 transform/opacity 避免影响其他动画。 */
+body, .card, .console-wrap, .stat-card, .sidebar, input, select, textarea,
+.btn, .tab-btn, .toast, .modal, .plugin-card, .cmd-card, .fav-chip {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
 /* 浅色主题（参照 easynode 浅色底 #E7EBF4 + 白卡片） */
-body.theme-light {
+[data-theme="light"] {
   --canvas: #eef1f6;
   --surface-1: #ffffff;
   --surface-2: #f4f6fa;
@@ -1069,16 +1094,42 @@ body.theme-light {
   --ink-tertiary: #9aa3b2;
   --hairline: #dde2ea;
   --hairline-strong: #c8cfdb;
+  /* 浅色主题下控制台仍保持深色（ANSI 调色板面向深色背景设计），
+     这些变量不覆盖，沿用 :root 默认值，确保深浅主题下控制台一致可读 */
 }
-body.theme-light .wallpaper-bg::after { background: rgba(255, 255, 255, 0.35); }
-body.theme-light input[type="text"],
-body.theme-light input[type="url"],
-body.theme-light input[type="number"],
-body.theme-light input[type="password"],
-body.theme-light textarea,
-body.theme-light select { box-shadow: none; }
-body.theme-light .card,
-body.theme-light .console-wrap { box-shadow: 0 1px 3px rgba(20, 30, 60, 0.08); }
+[data-theme="light"] .wallpaper-bg::after { background: rgba(255, 255, 255, 0.35); }
+[data-theme="light"] input[type="text"],
+[data-theme="light"] input[type="url"],
+[data-theme="light"] input[type="number"],
+[data-theme="light"] input[type="password"],
+[data-theme="light"] textarea,
+[data-theme="light"] select { box-shadow: none; }
+[data-theme="light"] .card,
+[data-theme="light"] .console-wrap { box-shadow: 0 1px 3px rgba(20, 30, 60, 0.08); }
+
+/* T2: 修复浅色主题 bug — 按钮/badge 上深色文字在彩色背景上看不清。
+   primary/success/danger 按钮永远用白色文字（无论主题），badge-default 同理。 */
+.btn-primary, .btn-success, .btn-danger,
+.badge-default { color: #fff !important; }
+/* btn-warning 黄底用黑字 */
+.btn-warning { color: #000 !important; }
+/* 浅色主题下 sidebar 状态点不变（绿/红在浅色背景上仍清晰） */
+/* 浅色主题下 hover 行加深一点对比度，避免几乎不可见 */
+[data-theme="light"] tr:hover td { background: var(--surface-3); }
+/* 浅色主题下 select 下拉箭头 svg 颜色调整（默认 #8a8f98 在浅色背景仍可读，保留） */
+
+/* T5: 三态主题切换器 UI（深色/浅色/系统循环） */
+.theme-toggle { position: relative; }
+.theme-toggle .theme-icon {
+  display: inline-block;
+  font-size: 14px;
+  line-height: 1;
+}
+.theme-toggle[data-current="dark"] .theme-icon::after { content: "🌙"; }
+.theme-toggle[data-current="light"] .theme-icon::after { content: "☀️"; }
+.theme-toggle[data-current="system"] .theme-icon::after { content: "🖥️"; }
+/* 当未设置 data-current（首次加载）时，由 JS 在 DOMContentLoaded 后补齐 */
+
 
 /* 控制台 JS 注入文本的主题化配色：跟随 --console-* 变量，深/浅主题下均清晰可读 */
 .c-cmd { color: var(--c-cmd); }
@@ -1812,7 +1863,22 @@ label.form-label {
 
 /* ─── 状态区域（watchdog.html） ─── */
 .status-area { font-size: 14px; line-height: 2; }
-.loading-text { color: var(--ink-subtle); }
+.loading-text {
+  color: var(--ink-subtle);
+  /* 首屏占位带 shimmer 动画，提升感知性能（参考 GitHub skeleton 最佳实践） */
+  background: linear-gradient(90deg,
+    var(--surface-2) 25%,
+    var(--surface-3) 50%,
+    var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--r-sm);
+  /* 尊重 prefers-reduced-motion：关闭动画避免眩晕 */
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-text { animation: none; background: var(--surface-2); }
+  .skeleton { animation: none; }
+}
 
 /* ─── 滚动容器（plugins.html 详情文档/数据） ─── */
 .pre-scroll {
