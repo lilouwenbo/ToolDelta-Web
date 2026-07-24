@@ -9,32 +9,35 @@
 <body>
     <script>
       (function(){ if (localStorage.getItem('td_theme') === 'light') document.body.classList.add('theme-light'); })();
-      function toggleTheme(){ var light = document.body.classList.toggle('theme-light'); localStorage.setItem('td_theme', light ? 'light' : 'dark'); }
+      function toggleTheme(){ var light = document.body.classList.toggle('theme-light'); localStorage.setItem('td_theme', light ? 'light' : 'dark'); var b=document.querySelector('.theme-toggle'); if(b){ b.setAttribute('aria-pressed', light ? 'true' : 'false'); } }
+      function toggleSidebar(){ document.body.classList.toggle('sidebar-open'); var b=document.querySelector('.sidebar-toggle-btn'); if(b){ b.setAttribute('aria-expanded', document.body.classList.contains('sidebar-open') ? 'true' : 'false'); } }
     </script>
     {% if wallpaper_url %}<div class="wallpaper-bg" style="background-image:url('{{ wallpaper_url }}')"></div>{% endif %}
     <script src="/static/js/wallpaper.js"></script>
-    <aside class="sidebar" id="sidebar"{% if wallpaper_url %} style="background:rgba(15,16,17,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-right-color:rgba(255,255,255,0.06)"{% endif %}>
+    <button class="sidebar-toggle-btn" onclick="toggleSidebar()" title="菜单" aria-label="切换菜单" aria-expanded="false">☰</button>
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()" role="button" tabindex="0" aria-label="关闭菜单"></div>
+    <aside class="sidebar" id="sidebar">
         <div class="brand">
             <span class="logo">TD</span>
             <span class="brand-name">ToolDelta</span>
             <span class="status-dot" id="sidebarStatus"></span>
         </div>
         <nav>
-            <a href="/" class="{% if active_page == 'index' %}active{% endif %}"><span class="nav-ico">📊</span>仪表盘</a>
-            <a href="/console" class="{% if active_page == 'console' %}active{% endif %}"><span class="nav-ico">🖥️</span>控制台</a>
-            <a href="/plugins" class="{% if active_page == 'plugins' %}active{% endif %}"><span class="nav-ico">🧩</span>插件管理</a>
-            <a href="/market" class="{% if active_page == 'market' %}active{% endif %}"><span class="nav-ico">🛒</span>插件市场</a>
-            <a href="/files" class="{% if active_page == 'files' %}active{% endif %}"><span class="nav-ico">📁</span>文件管理</a>
-            <a href="/commands" class="{% if active_page == 'commands' %}active{% endif %}"><span class="nav-ico">⌨️</span>命令参考</a>
-            <a href="/backup" class="{% if active_page == 'backup' %}active{% endif %}"><span class="nav-ico">💾</span>备份恢复</a>
-            <a href="/logs" class="{% if active_page == 'logs' %}active{% endif %}"><span class="nav-ico">📜</span>日志</a>
-            <a href="/connections" class="{% if active_page == 'connections' %}active{% endif %}"><span class="nav-ico">🌐</span>服务器连接</a>
-            <a href="/watchdog" class="{% if active_page == 'watchdog' %}active{% endif %}"><span class="nav-ico">🐕</span>看门狗</a>
-            <a href="/scheduler" class="{% if active_page == 'scheduler' %}active{% endif %}"><span class="nav-ico">⏰</span>定时任务</a>
-            <a href="/settings" class="{% if active_page == 'settings' %}active{% endif %}" style="margin-top:8px;border-top:1px solid var(--hairline);padding-top:12px"><span class="nav-ico">🎛️</span>面板设置</a>
+            <a href="/" class="{% if active_page == 'index' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">📊</span>仪表盘</a>
+            <a href="/console" class="{% if active_page == 'console' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">🖥️</span>控制台</a>
+            <a href="/plugins" class="{% if active_page == 'plugins' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">🧩</span>插件管理</a>
+            <a href="/market" class="{% if active_page == 'market' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">🛒</span>插件市场</a>
+            <a href="/files" class="{% if active_page == 'files' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">📁</span>文件管理</a>
+            <a href="/commands" class="{% if active_page == 'commands' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">⌨️</span>命令参考</a>
+            <a href="/backup" class="{% if active_page == 'backup' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">💾</span>备份恢复</a>
+            <a href="/logs" class="{% if active_page == 'logs' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">📜</span>日志</a>
+            <a href="/connections" class="{% if active_page == 'connections' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">🌐</span>服务器连接</a>
+            <a href="/watchdog" class="{% if active_page == 'watchdog' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">🐕</span>看门狗</a>
+            <a href="/scheduler" class="{% if active_page == 'scheduler' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">⏰</span>定时任务</a>
+            <a href="/settings" class="nav-separator {% if active_page == 'settings' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">🎛️</span>面板设置</a>
         </nav>
         <div class="sidebar-footer">
-            <button class="theme-toggle" onclick="toggleTheme()" title="切换深色 / 浅色主题">🌗 主题</button>
+            <button class="theme-toggle" onclick="toggleTheme()" title="切换深色 / 浅色主题" aria-pressed="false">🌗 主题</button>
             <div class="user-box">
                 <span class="user-name">{{ session.get('username','?') }}</span>
                 <a href="/logout" class="logout-link">退出</a>
@@ -49,7 +52,7 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <!-- 依赖安装遮罩层：高斯模糊背景 + 安装方式选择 + 动画进度条 + 实时日志 -->
-    <div class="dep-overlay" id="depOverlay">
+    <div class="dep-overlay" id="depOverlay" role="dialog" aria-modal="true" aria-labelledby="depTitle">
         <div class="dep-card">
             <!-- 步骤一：选择安装方式 -->
             <div class="dep-choose" id="depChoose">
@@ -103,10 +106,10 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="confirmModal">
-        <div class="modal" style="max-width:420px">
+    <div class="modal-overlay" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <div class="modal modal-sm">
             <h2 id="confirmTitle">确认</h2>
-            <p id="confirmMessage" style="font-size:14px;color:var(--ink-muted);line-height:1.6;margin-bottom:8px"></p>
+            <p id="confirmMessage" class="modal-message"></p>
             <div class="modal-actions">
                 <button class="btn btn-outline" onclick="closeConfirm(false)">取消</button>
                 <button class="btn btn-danger" id="confirmOkBtn" onclick="closeConfirm(true)">确定</button>

@@ -41,8 +41,8 @@ function loadDashboardStats() {
             // 服务器连接数
             setDashText('dashConnections', panel.connections_count != null ? panel.connections_count : 0);
 
-            // 插件数量
-            setDashText('dashPlugins', panel.plugins_count != null ? panel.plugins_count : 0);
+            // 定时任务数
+            setDashText('dashSchedJobs', panel.scheduler_jobs_count != null ? panel.scheduler_jobs_count : 0);
         })
         .catch(function (e) {
             console.error('loadDashboardStats error', e);

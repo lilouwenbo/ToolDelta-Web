@@ -4,26 +4,26 @@
 <div class="page-header">
     <h1>控制台</h1>
     <div>
-        <button class="btn" id="consoleToggleBtn" onclick="toggleTool()">检测中...</button>
-        <button class="btn btn-outline" onclick="clearConsole()">清屏</button>
+        <button class="btn btn-outline" id="consoleToggleBtn" onclick="toggleTool()" aria-label="启动或停止 ToolDelta">检测中...</button>
+        <button class="btn btn-outline" onclick="clearConsole()" aria-label="清空控制台输出">清屏</button>
     </div>
 </div>
 
 <div class="console-wrap">
     <div class="console-bar">
-        <span id="consoleStatus">🔴 未连接</span>
+        <span id="consoleStatus" role="status" aria-live="polite">🔴 未连接</span>
     </div>
-    <div class="fav-strip" id="favStrip"></div>
-    <div class="console-body" id="consoleBody"></div>
+    <div class="fav-strip" id="favStrip" aria-label="常用命令"></div>
+    <div class="console-body" id="consoleBody" role="log" aria-live="polite" aria-label="控制台输出" tabindex="0"></div>
     <div class="console-foot">
-        <input id="consoleInput" placeholder="输入命令...（↑/↓ 翻历史，Tab 补全）" autocomplete="off">
+        <input id="consoleInput" placeholder="输入命令...（↑/↓ 翻历史，Tab 补全）" autocomplete="off" aria-label="命令输入">
     </div>
 </div>
 
 <style>
 .console-wrap {
-  background: linear-gradient(180deg, #0a0c10, #050608 60%, #000);
-  border: 1px solid rgba(255,255,255,0.07);
+  background: linear-gradient(180deg, var(--console-bg), #050608 60%, #000);
+  border: 1px solid var(--hairline);
   border-radius: var(--r-lg);
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0,0,0,0.45), inset 0 0 80px rgba(0,0,0,0.55);
@@ -47,7 +47,7 @@
   max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   transition: all .15s var(--ease);
 }
-.fav-chip:hover { border-color:var(--primary); color:#fff; background:rgba(94,106,210,0.15); box-shadow:0 0 0 3px rgba(94,106,210,0.12); }
+.fav-chip:hover { border-color:var(--primary); color:var(--ink); background:rgba(94,106,210,0.15); box-shadow:0 0 0 3px rgba(94,106,210,0.12); }
 .console-body {
   height:440px; overflow-y:scroll; overflow-x:auto; padding:10px 14px;
   font-family:'Cascadia Code','Fira Code',Consolas,'Microsoft YaHei',monospace;

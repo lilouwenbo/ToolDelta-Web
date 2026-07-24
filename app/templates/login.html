@@ -9,45 +9,39 @@
         .auth-page {
             display: flex; align-items: center; justify-content: center;
             min-height: 100vh; background: var(--canvas);
-            position: relative;
+            position: relative; padding: 20px;
         }
-        .auth-wallpaper-bg {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background-size: cover; background-position: center; z-index: 0;
-        }
-        .auth-wallpaper-bg::after {
-            content: ''; position: absolute; inset: 0;
-            background: rgba(1,1,2,0.55);
-        }
-        .auth-card { position: relative; z-index: 1; }
         .auth-card {
-            background: rgba(20, 21, 22, 0.55);
+            position: relative; z-index: 1;
+            background: var(--glass-bg, rgba(20, 21, 22, 0.55));
             backdrop-filter: blur(24px) saturate(160%);
             -webkit-backdrop-filter: blur(24px) saturate(160%);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 16px; padding: 40px; width: 100%; max-width: 380px;
-            box-shadow: 0 24px 70px rgba(0,0,0,0.50);
-            animation: authPop 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+            border: 1px solid var(--glass-brd, rgba(255,255,255,0.08));
+            border-radius: 20px; padding: 44px 40px; width: 100%; max-width: 390px;
+            box-shadow: var(--shadow-lg, 0 24px 70px rgba(0,0,0,0.50));
+            animation: authPop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.1);
         }
-        @keyframes authPop { from { transform: translateY(14px) scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
-        .auth-card h1 {
-            font-size: 22px; font-weight: 600; margin-bottom: 4px; text-align: center;
-        }
-        .auth-card p.sub {
-            font-size: 13px; color: var(--ink-muted); text-align: center; margin-bottom: 28px;
-        }
+        @keyframes authPop { from { transform: translateY(16px) scale(0.96); opacity: 0; } to { transform: none; opacity: 1; } }
         .auth-card .logo-big {
-            display: block; width: 56px; height: 56px; margin: 0 auto 16px;
-            background: linear-gradient(135deg, #5e6ad2, #828fff 55%, #a78bfa); border-radius: 14px;
-            line-height: 56px; text-align: center;
-            font-size: 24px; font-weight: 700; color: #fff;
-            box-shadow: 0 6px 20px rgba(94, 106, 210, 0.45);
+            display: block; width: 60px; height: 60px; margin: 0 auto 18px;
+            background: var(--grad-primary, linear-gradient(135deg, #5e6ad2, #828fff 55%, #a78bfa));
+            border-radius: 16px; line-height: 60px; text-align: center;
+            font-size: 26px; font-weight: 700; color: #fff;
+            box-shadow: 0 8px 26px rgba(94, 106, 210, 0.45);
+            animation: logoFloat 3s ease-in-out infinite;
         }
-        .form-group { margin-bottom: 18px; }
+        @keyframes logoFloat { 0%,100%{ transform: translateY(0); } 50%{ transform: translateY(-4px); } }
+        .auth-card h1 { font-size: 23px; font-weight: 600; margin-bottom: 4px; text-align: center; letter-spacing: -0.4px; }
+        .auth-card p.sub { font-size: 13px; color: var(--ink-muted); text-align: center; margin-bottom: 30px; }
+        .form-group { margin-bottom: 20px; }
         .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--ink); }
-        .form-group input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(0,0,0,0.25); color: var(--ink); font-size: 14px; outline: none; box-sizing: border-box; transition: border-color .18s, box-shadow .18s; }
-        .form-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(94, 106, 210, 0.25); }
-        .auth-card .btn { width: 100%; padding: 10px; font-size: 15px; margin-top: 4px; }
+        .form-group .input-wrap { position: relative; }
+        .form-group .input-ico { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 15px; opacity: 0.5; pointer-events: none; }
+        .form-group input { width: 100%; padding: 11px 12px 11px 38px; border-radius: 10px; border: 1px solid var(--border, var(--hairline)); background: rgba(0,0,0,0.25); color: var(--ink); font-size: 14px; outline: none; box-sizing: border-box; transition: border-color .18s, box-shadow .18s; }
+        .form-group input:focus { border-color: var(--accent, var(--primary)); box-shadow: 0 0 0 3px rgba(94, 106, 210, 0.25); }
+        .auth-card .btn { width: 100%; padding: 12px; font-size: 15px; margin-top: 6px; }
+        .auth-card .pw-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 14px; opacity: 0.5; user-select: none; transition: opacity .15s; }
+        .auth-card .pw-toggle:hover { opacity: 1; }
     </style>
 </head>
 <body class="auth-page">
@@ -59,13 +53,20 @@
         <p class="sub">ToolDelta Web 管理面板</p>
         <div class="form-group">
             <label for="username">用户名</label>
-            <input type="text" id="username" placeholder="输入用户名" autocomplete="username">
+            <div class="input-wrap">
+                <span class="input-ico">👤</span>
+                <input type="text" id="username" placeholder="输入用户名" autocomplete="username">
+            </div>
         </div>
         <div class="form-group">
             <label for="password">密码</label>
-            <input type="password" id="password" placeholder="输入密码" autocomplete="current-password">
+            <div class="input-wrap">
+                <span class="input-ico">🔒</span>
+                <input type="password" id="password" placeholder="输入密码" autocomplete="current-password">
+                <span class="pw-toggle" onclick="var i=document.getElementById('password');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'">👁</span>
+            </div>
         </div>
-        <button class="btn btn-primary" onclick="doLogin()">登录</button>
+        <button class="btn btn-primary" id="loginBtn" onclick="doLogin()">登录</button>
     </div>
     <div class="toast-container" id="toastContainer"></div>
     <script>
@@ -82,15 +83,19 @@
             var u = document.getElementById('username').value.trim();
             var p = document.getElementById('password').value;
             if (!u || !p) { showToast('请输入用户名和密码', 'error'); return; }
+            var btn = document.getElementById('loginBtn');
+            btn.disabled = true; btn.textContent = '登录中...';
             fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p}) })
             .then(function(r){return r.json()})
             .then(function(d){
+                btn.disabled = false; btn.textContent = '登录';
                 if(d.success){ showToast('登录成功', 'success'); setTimeout(function(){ window.location.href='/'; }, 500); }
                 else { showToast(d.error||'登录失败', 'error'); }
             })
-            .catch(function(){ showToast('请求失败', 'error'); });
+            .catch(function(){ btn.disabled = false; btn.textContent = '登录'; showToast('请求失败', 'error'); });
         }
         document.getElementById('password').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
+        document.getElementById('username').addEventListener('keydown', function(e){ if(e.key==='Enter') document.getElementById('password').focus(); });
     </script>
 </body>
 </html>

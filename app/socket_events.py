@@ -1,4 +1,5 @@
 import time
+import threading
 from flask import request
 from flask_socketio import emit
 from app.tooldelta_manager import tooldelta_manager, ansi_to_html, escape_html
@@ -7,6 +8,7 @@ from app.tooldelta_manager import tooldelta_manager, ansi_to_html, escape_html
 _CMD_RATE_LIMIT = 10
 _CMD_RATE_WINDOW = 1.0
 _cmd_rate_map: dict[str, list[float]] = {}
+_cmd_rate_lock = threading.Lock()
 
 
 def _cleanup_cmd_rate(now):
@@ -17,18 +19,19 @@ def _cleanup_cmd_rate(now):
 
 
 def _check_cmd_rate(ip):
-    now = time.time()
-    # 每 100 次检查做一次轻量清理，平衡内存与性能
-    if len(_cmd_rate_map) >= 1000 and hash(ip) % 100 == 0:
-        _cleanup_cmd_rate(now)
-    window = _cmd_rate_map.get(ip, [])
-    window = [t for t in window if now - t < _CMD_RATE_WINDOW]
-    if len(window) >= _CMD_RATE_LIMIT:
+    with _cmd_rate_lock:
+        now = time.time()
+        # 每 100 次检查做一次轻量清理，平衡内存与性能
+        if len(_cmd_rate_map) >= 1000 and hash(ip) % 100 == 0:
+            _cleanup_cmd_rate(now)
+        window = _cmd_rate_map.get(ip, [])
+        window = [t for t in window if now - t < _CMD_RATE_WINDOW]
+        if len(window) >= _CMD_RATE_LIMIT:
+            _cmd_rate_map[ip] = window
+            return False
+        window.append(now)
         _cmd_rate_map[ip] = window
-        return False
-    window.append(now)
-    _cmd_rate_map[ip] = window
-    return True
+        return True
 
 
 def init_socketio(socketio):
@@ -46,6 +49,12 @@ def init_socketio(socketio):
 
     @socketio.on("console_command")
     def handle_command(data):
+        from flask import session
+        from flask_socketio import disconnect
+        # per-event 鉴权：长连接期间 session 可能过期
+        if not session.get("authenticated"):
+            disconnect()
+            return
         # 兼容字符串与 {"cmd": "..."} / {"command": "..."} 两种前端格式
         if isinstance(data, dict):
             cmd = data.get("cmd") or data.get("command") or ""
@@ -53,7 +62,10 @@ def init_socketio(socketio):
             cmd = data
         else:
             cmd = ""
-        cmd = (cmd or "").strip()
+        # 确保命令是字符串，防止非字符串类型导致 .strip() 崩溃
+        if not isinstance(cmd, str):
+            cmd = str(cmd) if cmd else ""
+        cmd = cmd.strip()
         if not cmd:
             return
         # 长度校验与前端保持一致，防止超长命令冲击子进程

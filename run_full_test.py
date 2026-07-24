@@ -83,6 +83,8 @@ r = client.get("/")
 rec("未配置时 / 跳转 /setup", r.status_code in (301,302) and "/setup" in (r.headers.get("Location") or ""), str(r.status_code))
 r, d = pj("/api/setup", {"username": "admin", "password": "admin123"})
 rec("初始化面板 /api/setup", d.get("success") is True, json.dumps(d, ensure_ascii=False))
+# 验证弱密码提示返回（admin123 是弱密码，但创建成功）
+rec("初始化返回弱密码警告", (d.get("data") or {}).get("password_warning") is not None, json.dumps(d, ensure_ascii=False)[:120])
 r, d = gj("/api/auth/status")
 rec("已配置且已登录", (d.get("data") or {}).get("isConfigured") is True and (d.get("data") or {}).get("authenticated") is True and (d.get("data") or {}).get("role") == 10, json.dumps(d))
 for page in ["/", "/files", "/console", "/plugins", "/market", "/backup", "/commands", "/logs", "/settings"]:
@@ -135,6 +137,20 @@ r, d = pj("/api/change-password", {"old_password": "admin123", "new_password": "
 rec("修改自身密码 change-password", d.get("success") is True, json.dumps(d, ensure_ascii=False))
 r, d = pj("/api/users/delete", {"username": "user1"})
 rec("删除用户 delete", d.get("success") is True, json.dumps(d, ensure_ascii=False))
+
+# C2. 弱密码策略：弱密码仅提示不阻止
+r, d = pj("/api/users/create", {"username": "weakuser", "password": "1", "role": 1})
+rec("弱密码创建用户(仅提示不阻止)", d.get("success") is True, json.dumps(d, ensure_ascii=False)[:100])
+r, d = pj("/api/users/delete", {"username": "weakuser"})
+rec("删除弱密码用户", d.get("success") is True, json.dumps(d, ensure_ascii=False))
+# 验证密码强度函数
+from app.auth_service import check_password_strength
+lvl, tips = check_password_strength("a")
+rec("密码强度检测: 单字符=weak", lvl == "weak" and len(tips) > 0, "level=%s tips=%s" % (lvl, tips))
+lvl, tips = check_password_strength("abcd1234")
+rec("密码强度检测: 8位字母+数字=medium", lvl == "medium", "level=%s" % lvl)
+lvl, tips = check_password_strength("Abc123!@#xyz")
+rec("密码强度检测: 12位含特殊字符=strong", lvl == "strong", "level=%s" % lvl)
 
 # ============ D. 插件管理 ============
 print("\n== D. 插件管理 ==")
@@ -458,6 +474,79 @@ r, d = gj("/api/logs/sources")
 rec("日志来源列表为数组", isinstance(d, list), json.dumps(d, ensure_ascii=False)[:80])
 r = client.get("/api/logs/export")
 rec("日志导出返回文本", r.status_code == 200 and (r.headers.get("Content-Type") or "").startswith("text/plain"), "status=%d" % r.status_code)
+
+# ============ R. UI 无障碍与样式统一性 ============
+print("\n== R. UI 无障碍与样式统一性 ==")
+import re as _re
+def _body(path):
+    r = client.get(path)
+    return r.get_data(as_text=True) if r.status_code == 200 else ""
+
+# R1. 模态框具备 ARIA dialog 语义
+html_base = _body("/")
+rec("base 确认弹窗含 role=dialog/aria-modal", 'role="dialog"' in html_base and 'aria-modal="true"' in html_base, "")
+rec("base 确认弹窗用 modal-sm 替代内联 max-width", 'modal-sm' in html_base, "")
+
+# R2. 导航图标 aria-hidden、aria-expanded、nav-separator
+rec("base 导航图标 aria-hidden", 'aria-hidden="true"' in html_base, "")
+rec("base 菜单按钮 aria-expanded", 'aria-expanded=' in html_base, "")
+rec("base 面板设置 nav-separator", 'nav-separator' in html_base, "")
+
+# R3. 表单控件统一 form-control / label for 关联
+html_sched = _body("/scheduler")
+rec("scheduler 用 form-control 类", 'form-control' in html_sched, "")
+rec("scheduler label 带 for 关联", '<label for=' in html_sched, "")
+rec("scheduler 模态框 modal-md", 'modal-md' in html_sched, "")
+rec("scheduler 模态框 ARIA", 'role="dialog"' in html_sched, "")
+
+html_wd = _body("/watchdog")
+rec("watchdog 用 form-control 类", 'form-control' in html_wd, "")
+rec("watchdog label 带 for 关联", '<label for=' in html_wd, "")
+rec("watchdog 状态区 role=status/aria-live", 'role="status"' in html_wd and 'aria-live=' in html_wd, "")
+
+html_conn = _body("/connections")
+rec("connections 无本地 <style> 块污染", '<style>' not in html_conn, "")
+rec("connections 用 form-control 类", 'form-control' in html_conn, "")
+rec("connections 用 table-wrap", 'table-wrap' in html_conn, "")
+rec("connections 空状态图标非占位符", '🌐' in html_conn, "")
+
+# R4. 控制台无障碍语义
+html_console = _body("/console")
+rec("console 状态 role=status/aria-live", 'role="status"' in html_console and 'aria-live=' in html_console, "")
+rec("console 输出区 role=log", 'role="log"' in html_console, "")
+rec("console 命令输入 aria-label", 'aria-label=' in html_console, "")
+rec("console 用 --console-bg 变量替代硬编码", 'var(--console-bg)' in html_console, "")
+
+# R5. 文件管理：code-editor / form-control / table / ARIA
+html_files = _body("/files")
+rec("files 用 code-editor 类", 'code-editor' in html_files, "")
+rec("files 用 form-control 类", 'form-control' in html_files, "")
+rec("files 用 table 类", 'class="table"' in html_files, "")
+rec("files 模态框 ARIA", 'role="dialog"' in html_files, "")
+rec("files 搜索框 aria-label", 'aria-label="搜索文件"' in html_files, "")
+
+# R6. 插件管理：label for / tablist / 空状态图标
+html_plugins = _body("/plugins")
+rec("plugins label 带 for 关联", 'for="pluginZip"' in html_plugins or 'for="marketUrl"' in html_plugins, "")
+rec("plugins tabs 含 role=tablist", 'role="tablist"' in html_plugins, "")
+rec("plugins tab-btn 含 role=tab/aria-selected", 'role="tab"' in html_plugins and 'aria-selected=' in html_plugins, "")
+rec("plugins 空状态图标非占位符", '🧩' in html_plugins, "")
+rec("plugins 模态框 ARIA", 'role="dialog"' in html_plugins, "")
+
+# R7. 备份页：backup-item 类 / 错误处理 / 空状态图标
+html_backup = _body("/backup")
+rec("backup 用 backup-item 类", 'backup-item' in html_backup, "")
+rec("backup 空状态图标非占位符", '💾' in html_backup, "")
+rec("backup 含 .catch 错误处理", '.catch(' in html_backup, "")
+
+# R8. 全局 CSS 含新增辅助类
+css_path = os.path.join(ROOT, "app", "static", "css", "style.css")
+with open(css_path, "r", encoding="utf-8") as _f:
+    css = _f.read()
+for _cls in [".form-control", ".modal-sm", ".modal-md", ".modal-lg", ".table-wrap",
+             ".code-editor", ".backup-item", ".check-label", ".help-text",
+             ".breadcrumb-link", ".sr-only", ".nav-separator", ".status-area"]:
+    rec("CSS 含辅助类 %s" % _cls, _cls in css, "")
 
 passed = sum(1 for _, ok, _ in results if ok)
 failed = [n for n, ok, _ in results if not ok]

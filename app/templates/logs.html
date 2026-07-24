@@ -4,7 +4,9 @@
 <div class="page-header">
     <h1>日志</h1>
     <div>
+        <button class="btn btn-primary" onclick="loadLogs()">搜索</button>
         <button class="btn btn-outline" onclick="refreshLogs()">刷新</button>
+        <button class="btn btn-outline" onclick="doExport()">导出</button>
         <button class="btn btn-outline" onclick="clearDisplay()">清屏</button>
     </div>
 </div>
@@ -21,9 +23,6 @@
     <select id="logDate" onchange="loadLogs()">
         <option value="today">今天</option>
     </select>
-    <button class="btn btn-primary" onclick="loadLogs()">搜索</button>
-    <button class="btn btn-outline" onclick="refreshLogs()">刷新</button>
-    <button class="btn btn-outline" onclick="doExport()">导出</button>
 </div>
 
 <div class="console-wrap">

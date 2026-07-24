@@ -255,6 +255,14 @@ class DashboardService:
         except Exception:
             plugins_count = 0
 
+        # 定时任务数
+        try:
+            from app.scheduler_service import scheduler_service
+            scheduler_jobs = scheduler_service.list_jobs() or []
+            scheduler_jobs_count = len(scheduler_jobs)
+        except Exception:
+            scheduler_jobs_count = 0
+
         return {
             "system": {
                 "cpu_percent": cpu_percent,
@@ -270,6 +278,7 @@ class DashboardService:
                 "watchdog_enabled": watchdog_enabled,
                 "connections_count": connections_count,
                 "plugins_count": plugins_count,
+                "scheduler_jobs_count": scheduler_jobs_count,
             },
         }
 

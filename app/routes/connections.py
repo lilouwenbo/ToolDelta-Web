@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, session
 
 from app import connection_service as conn_svc
 
@@ -16,6 +16,13 @@ def _fail(msg):
     return jsonify({"success": False, "error": msg})
 
 
+def _admin_required():
+    """校验当前会话是否为管理员，非管理员返回错误响应。"""
+    if session.get("role") != 10:
+        return jsonify({"success": False, "error": "无权限，仅管理员可操作"}), 403
+    return None
+
+
 @bp.route("/connections")
 def connections_page():
     return render_template("connections.html")
@@ -28,6 +35,9 @@ def api_list():
 
 @bp.route("/api/connections/add", methods=["POST"])
 def api_add():
+    err = _admin_required()
+    if err:
+        return err
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
     host = (data.get("host") or "").strip()
@@ -55,6 +65,9 @@ def api_add():
 
 @bp.route("/api/connections/update", methods=["POST"])
 def api_update():
+    err = _admin_required()
+    if err:
+        return err
     data = request.get_json(silent=True) or {}
     conn_id = data.get("id")
     if not conn_id:
@@ -72,6 +85,9 @@ def api_update():
 
 @bp.route("/api/connections/delete", methods=["POST"])
 def api_delete():
+    err = _admin_required()
+    if err:
+        return err
     data = request.get_json(silent=True) or {}
     conn_id = data.get("id")
     if not conn_id:
@@ -84,6 +100,9 @@ def api_delete():
 
 @bp.route("/api/connections/default", methods=["POST"])
 def api_default():
+    err = _admin_required()
+    if err:
+        return err
     data = request.get_json(silent=True) or {}
     conn_id = data.get("id")
     if not conn_id:

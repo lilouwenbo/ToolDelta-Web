@@ -597,6 +597,9 @@ tr:hover td { background: var(--surface-2); }
 }
 .badge-primary { background: rgba(94, 106, 210, 0.15); color: var(--primary-hover); }
 .badge-count { background: var(--surface-2); color: var(--ink-muted); }
+.badge-default { background: var(--primary); color: var(--ink); }
+.badge-normal { color: var(--ink-subtle); font-size: 13px; font-weight: 400; }
+.badge-muted { color: var(--ink-subtle); font-size: 13px; font-weight: 400; }
 
 /* ─── Quick actions ─── */
 
@@ -606,6 +609,7 @@ tr:hover td { background: var(--surface-2); }
   flex-wrap: wrap;
   align-items: center;
 }
+.quick-actions .btn { min-width: 120px; justify-content: center; }
 
 /* ─── Dividers ─── */
 
@@ -618,16 +622,54 @@ hr {
 /* ─── Responsive ─── */
 
 @media (max-width: 900px) {
-  .sidebar { width: 160px; }
-  .main-content { margin-left: 160px; padding: 20px; }
+  :root { --sidebar-width: 0px; }
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s var(--ease, ease);
+    z-index: 200;
+    width: 220px;
+  }
+  body.sidebar-open .sidebar { transform: translateX(0); }
+  body.sidebar-open .sidebar-backdrop {
+    display: block;
+    position: fixed; inset: 0; z-index: 150;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(2px);
+    animation: depFade 0.2s ease;
+  }
+  .sidebar-toggle-btn {
+    display: flex !important;
+    position: fixed; top: 14px; left: 14px; z-index: 201;
+    width: 40px; height: 40px;
+    align-items: center; justify-content: center;
+    background: var(--glass-bg, rgba(20,21,22,0.55));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-brd, rgba(255,255,255,0.08));
+    border-radius: 10px;
+    color: var(--ink);
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.3));
+    transition: transform .15s var(--ease, ease);
+  }
+  .sidebar-toggle-btn:hover { transform: scale(1.05); }
+  .main-content { margin-left: 0; padding: 64px 16px 24px; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .plugin-grid { grid-template-columns: 1fr; }
 }
 
+.sidebar-toggle-btn { display: none; }
+.sidebar-backdrop { display: none; }
+
 @media (max-width: 600px) {
-  .main-content { padding: 16px; }
+  .main-content { padding: 60px 12px 16px; }
   .stat-grid { grid-template-columns: 1fr; }
   .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .card { padding: 16px; }
+  .stat-card { padding: 16px; }
+  .search-bar { flex-direction: column; }
+  .modal { width: 95%; padding: 20px; max-height: 85vh; }
 }
 
 /* ─── UI 升级：参考 easynode 设计语言 ─── */
@@ -1249,3 +1291,193 @@ body, .sidebar, .card, .stat-card, .console-wrap, .modal, .dep-card, .onb-card {
     transition-duration: .001ms !important;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   UI v4 — 密码强度指示器 + 统一表单样式（GitHub 风格）
+   ════════════════════════════════════════════════════════════════ */
+
+/* ─── 密码强度指示器（setup / settings 通用） ─── */
+.pw-strength-box {
+  margin: -8px 0 14px;
+  animation: fadeUp .25s var(--ease);
+}
+.pw-meter {
+  height: 6px; border-radius: 999px; overflow: hidden;
+  background: var(--surface-3); border: 1px solid var(--hairline);
+  margin-bottom: 8px;
+}
+.pw-bar {
+  display: block; height: 100%; width: 33%;
+  border-radius: 999px; transition: width .35s var(--ease), background .25s;
+}
+.pw-bar-weak    { width: 33%;  background: var(--grad-danger); }
+.pw-bar-medium  { width: 66%;  background: var(--grad-warn); }
+.pw-bar-strong  { width: 100%; background: var(--grad-success); }
+.pw-hint {
+  font-size: 12px; line-height: 1.55; padding: 8px 10px;
+  border-radius: var(--r-md); border: 1px solid transparent;
+}
+.pw-hint-weak {
+  color: #ff7a7e; background: rgba(229, 72, 77, 0.10);
+  border-color: rgba(229, 72, 77, 0.28);
+}
+.pw-hint-medium {
+  color: var(--warning); background: rgba(245, 166, 35, 0.10);
+  border-color: rgba(245, 166, 35, 0.28);
+}
+.pw-hint-strong {
+  color: var(--success); background: rgba(39, 166, 68, 0.10);
+  border-color: rgba(39, 166, 68, 0.28);
+}
+
+/* ─── 统一表单控件（消除模板内散落的 inline 样式） ─── */
+.form-group label.form-label,
+label.form-label {
+  display: block; font-size: 13px; font-weight: 500;
+  margin-bottom: 6px; color: var(--ink);
+}
+.form-control {
+  width: 100%; padding: 9px 12px; border-radius: var(--r-md);
+  border: 1px solid var(--hairline); background: var(--surface-1);
+  color: var(--ink); font-size: 14px; outline: none;
+  box-sizing: border-box; transition: border-color .15s, box-shadow .15s;
+}
+.form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(94, 106, 210, 0.20);
+}
+.form-control::placeholder { color: var(--ink-tertiary); }
+.form-hint {
+  font-size: 11px; color: var(--ink-tertiary);
+  margin-top: 4px; display: block; line-height: 1.5;
+}
+
+/* ─── 卡片小标题统一（settings.html 中原本用 <h2>） ─── */
+.card-title {
+  font-size: 16px; font-weight: 600;
+  margin-bottom: 16px; color: var(--ink);
+  letter-spacing: -0.2px;
+}
+
+/* ─── 页头副标题 / 计数文本统一（替换 --text-secondary 引用） ─── */
+.page-subtitle {
+  font-size: 13px; color: var(--ink-subtle);
+  font-weight: 500;
+}
+
+/* ─── 危险卡片：边框强调（settings.html 危险操作区） ─── */
+.card-danger {
+  border-color: rgba(229, 72, 77, 0.4) !important;
+  background: rgba(229, 72, 77, 0.04);
+}
+.card-danger .card-title { color: #ff7a7e; }
+
+/* ─── 横向工具栏：search-bar 增强 ─── */
+.search-bar select,
+.search-bar input { min-width: 140px; }
+
+/* ─── 侧边栏分隔链接（面板设置） ─── */
+.nav-separator {
+  margin-top: 8px;
+  border-top: 1px solid var(--hairline);
+  padding-top: 12px;
+}
+
+/* ─── 屏幕阅读器专用（视觉隐藏但可读） ─── */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* ─── 统一表单辅助类（消除 scheduler/watchdog/connections 等模板内 inline 样式） ─── */
+.form-group { margin-bottom: 14px; }
+.form-group > label {
+  display: block; font-size: 13px; font-weight: 500;
+  margin-bottom: 6px; color: var(--ink-muted);
+}
+.form-row {
+  display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.form-row .form-group { flex: 1 1 0; min-width: 0; margin-bottom: 0; }
+.form-group--narrow { flex: 0 0 140px; }
+.check-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; cursor: pointer; color: var(--ink-muted);
+}
+.help-text {
+  font-size: 13px; color: var(--ink-subtle);
+  line-height: 1.6; margin-bottom: 14px;
+}
+.notice {
+  font-size: 13px; color: var(--ink-subtle); line-height: 1.6;
+}
+
+/* ─── 模态框尺寸修饰符（替代各模板 max-width 内联样式） ─── */
+.modal-sm { max-width: 420px; }
+.modal-md { max-width: 520px; }
+.modal-lg { max-width: 800px; }
+.modal-message {
+  font-size: 14px; color: var(--ink-muted);
+  line-height: 1.6; margin-bottom: 8px;
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px;
+}
+.modal-title { font-size: 16px; font-weight: 600; color: var(--ink); }
+.modal-footer {
+  display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end;
+}
+
+/* ─── 表格增强：斑马纹 + 行 hover + 横向滚动包裹 ─── */
+.table-wrap { overflow-x: auto; }
+.table tbody tr:nth-child(even) td { background: rgba(255, 255, 255, 0.015); }
+.table tbody tr:hover td { background: var(--surface-2); }
+.table-loading { text-align: center; color: var(--ink-subtle); }
+
+/* ─── 文件列表行操作（files.html） ─── */
+.file-actions { display: flex; gap: 4px; white-space: nowrap; }
+.breadcrumb-bar {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 12px 16px; margin-bottom: 12px;
+}
+.breadcrumb-link { color: var(--primary); text-decoration: none; }
+.breadcrumb-link:hover { text-decoration: underline; }
+.breadcrumb-sep { color: var(--ink-tertiary); }
+
+/* ─── 代码编辑器（files.html 在线编辑） ─── */
+.code-editor {
+  width: 100%; height: 60vh; padding: 12px;
+  border-radius: var(--r-md); border: 1px solid var(--hairline);
+  background: var(--surface-1); color: var(--ink);
+  font-family: 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace;
+  font-size: 13px; resize: vertical; outline: none; box-sizing: border-box;
+}
+
+/* ─── 备份项 / 数据文件行（backup.html / plugins.html） ─── */
+.backup-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 14px; border: 1px solid var(--hairline);
+  border-radius: var(--r-md); margin-bottom: 8px;
+  background: var(--surface-1);
+}
+.backup-meta { font-size: 12px; color: var(--ink-subtle); margin-top: 4px; }
+.backup-actions { display: flex; gap: 8px; }
+.kv-table { width: 100%; }
+.kv-table td { padding: 6px 8px; font-size: 13px; }
+.kv-key { width: 100px; color: var(--ink-subtle); }
+
+/* ─── 状态区域（watchdog.html） ─── */
+.status-area { font-size: 14px; line-height: 2; }
+.loading-text { color: var(--ink-subtle); }
+
+/* ─── 滚动容器（plugins.html 详情文档/数据） ─── */
+.pre-scroll {
+  font-size: 12px; white-space: pre-wrap;
+  max-height: 300px; overflow: auto;
+  background: var(--surface-1); border: 1px solid var(--hairline);
+  border-radius: var(--r-md); padding: 10px;
+}
+.meta-text { font-size: 13px; color: var(--ink-subtle); margin-bottom: 8px; }
+.source-info { margin-top: 8px; }

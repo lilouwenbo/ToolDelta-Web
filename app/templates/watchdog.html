@@ -11,35 +11,35 @@
 
 <div class="card" style="margin-bottom:20px">
     <h3>监控配置</h3>
-    <p style="font-size:13px;color:var(--ink-subtle);margin-bottom:14px">
+    <p class="help-text">
         看门狗会定期检查 ToolDelta 主进程是否存活，进程停止/崩溃时按下面的策略自动重启。
     </p>
 
-    <div class="form-group" style="margin-bottom:12px">
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="cfg_enabled" style="accent-color:var(--primary)"> 启用看门狗
+    <div class="form-group">
+        <label class="check-label" for="cfg_enabled">
+            <input type="checkbox" id="cfg_enabled"> 启用看门狗
         </label>
     </div>
 
-    <div class="form-group" style="margin-bottom:12px">
-        <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:var(--ink-muted)">检查间隔（秒）</label>
-        <input type="number" id="cfg_check_interval" min="1" value="10" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:14px;outline:none;box-sizing:border-box">
+    <div class="form-group">
+        <label for="cfg_check_interval">检查间隔（秒）</label>
+        <input type="number" id="cfg_check_interval" class="form-control" min="1" value="10">
     </div>
 
-    <div class="form-group" style="margin-bottom:12px">
-        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="cfg_auto_restart" style="accent-color:var(--primary)"> 进程停止时自动重启
+    <div class="form-group">
+        <label class="check-label" for="cfg_auto_restart">
+            <input type="checkbox" id="cfg_auto_restart"> 进程停止时自动重启
         </label>
     </div>
 
-    <div class="form-group" style="margin-bottom:12px">
-        <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:var(--ink-muted)">最大重启次数</label>
-        <input type="number" id="cfg_max_restarts" min="0" value="5" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:14px;outline:none;box-sizing:border-box">
+    <div class="form-group">
+        <label for="cfg_max_restarts">最大重启次数</label>
+        <input type="number" id="cfg_max_restarts" class="form-control" min="0" value="5">
     </div>
 
-    <div class="form-group" style="margin-bottom:12px">
-        <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:var(--ink-muted)">重启冷却时间（秒）</label>
-        <input type="number" id="cfg_restart_cooldown" min="0" value="30" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:14px;outline:none;box-sizing:border-box">
+    <div class="form-group">
+        <label for="cfg_restart_cooldown">重启冷却时间（秒）</label>
+        <input type="number" id="cfg_restart_cooldown" class="form-control" min="0" value="30">
     </div>
 
     <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
@@ -47,8 +47,8 @@
 
 <div class="card">
     <h3>运行状态</h3>
-    <div id="statusArea" style="font-size:14px;line-height:2">
-        <div style="color:var(--ink-subtle)">加载中...</div>
+    <div id="statusArea" class="status-area" role="status" aria-live="polite">
+        <div class="loading-text">加载中...</div>
     </div>
 </div>
 {% endblock %}

@@ -3,68 +3,70 @@
 <div>
     <div class="page-header">
         <h1>文件管理</h1>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="form-row">
             <button class="btn btn-outline" onclick="showNewFolder()">新建文件夹</button>
             <button class="btn btn-outline" onclick="downloadDir()" id="downloadDirBtn" style="display:none">下载目录</button>
             <button class="btn btn-outline" onclick="batchDelete()" id="batchDelBtn" style="display:none">删除选中</button>
             <button class="btn btn-primary" onclick="document.getElementById('uploadInput').click()">上传文件</button>
-            <input type="file" id="uploadInput" style="display:none" multiple onchange="uploadFiles(this.files)">
+            <input type="file" id="uploadInput" style="display:none" multiple aria-label="选择上传文件" onchange="uploadFiles(this.files)">
         </div>
     </div>
 
     <div class="card" style="padding:12px 16px;margin-bottom:12px">
-        <div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap">
-            <span style="color:var(--ink-muted)">位置:</span>
-            <a href="#" onclick="navigateTo('')" style="color:var(--primary);text-decoration:none">/</a>
+        <div class="breadcrumb-bar" style="padding:0;margin-bottom:8px">
+            <span class="notice">位置:</span>
+            <a href="#" onclick="navigateTo('')" class="breadcrumb-link">/</a>
             <span id="breadcrumbs" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"></span>
             <span style="margin-left:auto;color:var(--ink-subtle);font-size:12px" id="fileCount"></span>
         </div>
-        <div style="display:flex;gap:8px;margin-top:8px">
-            <input type="text" id="searchInput" placeholder="搜索文件..." style="flex:1;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:13px;outline:none" onkeydown="if(event.key==='Enter')doSearch()">
+        <div class="form-row" style="margin:0">
+            <input type="text" id="searchInput" class="form-control" placeholder="搜索文件..." aria-label="搜索文件" onkeydown="if(event.key==='Enter')doSearch()">
             <button class="btn btn-sm btn-outline" onclick="doSearch()">搜索</button>
             <button class="btn btn-sm btn-outline" onclick="clearSearch()" id="clearSearchBtn" style="display:none">清除</button>
         </div>
     </div>
 
     <div class="card" style="padding:0;overflow:hidden">
-        <table style="width:100%">
-            <thead>
-                <tr>
-                    <th style="padding:10px 14px;width:32px"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)"></th>
-                    <th style="padding:10px 14px;cursor:pointer" onclick="setSort('name')">名称 <span id="sortName" style="color:var(--ink-tertiary);font-size:11px"></span></th>
-                    <th style="padding:10px 14px;width:100px;cursor:pointer" onclick="setSort('size')">大小 <span id="sortSize" style="color:var(--ink-tertiary);font-size:11px"></span></th>
-                    <th style="padding:10px 14px;width:160px;cursor:pointer" onclick="setSort('mtime')">修改时间 <span id="sortMtime" style="color:var(--ink-tertiary);font-size:11px"></span></th>
-                    <th style="padding:10px 14px;width:180px">操作</th>
-                </tr>
-            </thead>
-            <tbody id="fileList"></tbody>
-        </table>
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width:32px"><input type="checkbox" id="selectAll" aria-label="全选" onchange="toggleSelectAll(this.checked)"></th>
+                        <th style="cursor:pointer" onclick="setSort('name')">名称 <span id="sortName" class="loading-text" style="font-size:11px" aria-hidden="true"></span></th>
+                        <th style="width:100px;cursor:pointer" onclick="setSort('size')">大小 <span id="sortSize" class="loading-text" style="font-size:11px" aria-hidden="true"></span></th>
+                        <th style="width:160px;cursor:pointer" onclick="setSort('mtime')">修改时间 <span id="sortMtime" class="loading-text" style="font-size:11px" aria-hidden="true"></span></th>
+                        <th style="width:180px">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="fileList"></tbody>
+            </table>
+        </div>
         <div id="emptyState" class="empty-state" style="display:none">
-            <div class="icon" id="emptyIcon">📁</div>
+            <div class="icon" id="emptyIcon" aria-hidden="true">📁</div>
             <p id="emptyText">此目录为空</p>
         </div>
     </div>
 </div>
 
-<div class="modal-overlay" id="editorModal">
-    <div class="modal" style="max-width:800px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-            <h2 style="font-size:16px;font-weight:600" id="editorTitle">编辑文件</h2>
-            <div style="display:flex;gap:6px">
+<div class="modal-overlay" id="editorModal" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <h2 class="modal-title" id="editorTitle">编辑文件</h2>
+            <div class="file-actions">
                 <button class="btn btn-sm btn-primary" onclick="saveEditor()">保存</button>
                 <button class="btn btn-sm btn-outline" onclick="closeEditor()">取消</button>
             </div>
         </div>
-        <textarea id="editorContent" style="width:100%;height:60vh;padding:12px;border-radius:8px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-family:'Cascadia Code','Consolas',monospace;font-size:13px;resize:vertical;outline:none;box-sizing:border-box" spellcheck="false"></textarea>
+        <textarea id="editorContent" class="code-editor" spellcheck="false" aria-label="文件内容编辑器"></textarea>
     </div>
 </div>
 
-<div class="modal-overlay" id="moveCopyModal">
-    <div class="modal" style="max-width:480px">
-        <h2 id="moveCopyTitle" style="font-size:16px;font-weight:600;margin-bottom:16px">移动/复制</h2>
-        <p style="font-size:13px;color:var(--ink-muted);margin-bottom:12px" id="moveCopyDesc"></p>
-        <input type="text" id="moveCopyPath" placeholder="输入目标路径..." style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:13px;outline:none;box-sizing:border-box">
-        <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+<div class="modal-overlay" id="moveCopyModal" role="dialog" aria-modal="true" aria-labelledby="moveCopyTitle">
+    <div class="modal modal-md">
+        <h2 class="modal-title" id="moveCopyTitle" style="margin-bottom:16px">移动/复制</h2>
+        <p class="modal-message" style="font-size:13px;margin-bottom:12px" id="moveCopyDesc"></p>
+        <input type="text" id="moveCopyPath" class="form-control" placeholder="输入目标路径..." aria-label="目标路径">
+        <div class="modal-footer">
             <button class="btn btn-primary btn-sm" id="moveCopyConfirmBtn" onclick="confirmMoveCopy()">确认</button>
             <button class="btn btn-outline btn-sm" onclick="closeMoveCopy()">取消</button>
         </div>

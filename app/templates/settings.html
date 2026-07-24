@@ -28,22 +28,50 @@
     </div>
 
     <div class="card" style="margin-bottom:20px">
-        <h2 style="font-size:16px;font-weight:600;margin-bottom:16px">修改密码</h2>
+        <h2 class="card-title">修改密码</h2>
         <div class="form-group" style="margin-bottom:12px">
-            <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:var(--ink-muted)">当前密码</label>
-            <input type="password" id="oldPw" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:14px;outline:none;box-sizing:border-box">
+            <label class="form-label">当前密码</label>
+            <input type="password" id="oldPw" class="form-control">
         </div>
         <div class="form-group" style="margin-bottom:12px">
-            <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:var(--ink-muted)">新密码</label>
-            <input type="password" id="newPw" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:14px;outline:none;box-sizing:border-box">
-            <span style="font-size:11px;color:var(--ink-tertiary);margin-top:4px;display:block">密码长度8-64位</span>
+            <label class="form-label">新密码</label>
+            <input type="password" id="newPw" class="form-control" oninput="renderSettingsPwStrength(this.value)">
+            <span class="form-hint">密码长度1-64位，建议8位以上并包含字母、数字、特殊字符；弱密码仅提示不阻止修改。</span>
+            <div id="settingsPwBox" class="pw-strength-box" style="display:none;margin-top:8px"></div>
         </div>
         <div class="form-group" style="margin-bottom:12px">
-            <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:var(--ink-muted)">确认新密码</label>
-            <input type="password" id="newPw2" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:14px;outline:none;box-sizing:border-box">
+            <label class="form-label">确认新密码</label>
+            <input type="password" id="newPw2" class="form-control">
         </div>
         <button class="btn btn-primary" onclick="changePassword()">修改密码</button>
     </div>
+    <script>
+    // 设置页：复用 setup.html 的实时密码强度指示器逻辑（弱密码仅提示不阻止）
+    function renderSettingsPwStrength(pw) {
+        var box = document.getElementById('settingsPwBox');
+        if (!box) return;
+        if (!pw) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        var hasL = /[A-Za-z]/.test(pw), hasD = /\d/.test(pw), hasS = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pw);
+        var level = 'weak';
+        if (pw.length >= 12 && hasL && hasD && hasS) level = 'strong';
+        else if (pw.length >= 8 && hasL && hasD) level = 'medium';
+        var tips = [];
+        if (pw.length < 8) tips.push('建议长度至少8位');
+        if (!hasL) tips.push('建议包含字母');
+        if (!hasD) tips.push('建议包含数字');
+        if (!hasS) tips.push('建议包含特殊字符');
+        if ({password123:1,12345678:1,qwerty123:1,admin123:1,11111111:1}[pw.toLowerCase()]) tips.push('该密码过于常见');
+        if (level === 'strong' && !tips.length) {
+            box.style.display = 'block';
+            box.innerHTML = '<div class="pw-meter"><span class="pw-bar pw-bar-strong"></span></div><div class="pw-hint pw-hint-strong">密码强度：强 ✓</div>';
+            return;
+        }
+        var labels = {weak:'弱', medium:'中', strong:'强'};
+        box.style.display = 'block';
+        box.innerHTML = '<div class="pw-meter"><span class="pw-bar pw-bar-' + level + '"></span></div>' +
+            '<div class="pw-hint pw-hint-' + level + '">密码强度：' + labels[level] + (tips.length ? ' · ' + tips.join('；') : '') + '</div>';
+    }
+    </script>
 
     <div class="card" style="margin-bottom:20px">
         <h2 style="font-size:16px;font-weight:600;margin-bottom:16px">启动器配置</h2>
@@ -110,17 +138,18 @@
 
     {% if session.get('role') == 10 %}
     <div class="card" style="margin-bottom:20px">
-        <h2 style="font-size:16px;font-weight:600;margin-bottom:16px">用户管理</h2>
+        <h2 class="card-title">用户管理</h2>
         <div style="margin-bottom:12px">
             <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-                <input type="text" id="newUserName" placeholder="用户名" style="flex:1;min-width:120px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:13px;outline:none">
-                <input type="password" id="newUserPw" placeholder="密码" style="flex:1;min-width:120px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:13px;outline:none">
-                <select id="newUserRole" style="padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:13px;outline:none">
+                <input type="text" id="newUserName" class="form-control" placeholder="用户名" style="flex:1;min-width:120px">
+                <input type="password" id="newUserPw" class="form-control" placeholder="密码" style="flex:1;min-width:120px" oninput="renderCreateUserPwStrength(this.value)">
+                <select id="newUserRole" class="form-control" style="min-width:120px">
                     <option value="1">普通用户</option>
                     <option value="10">管理员</option>
                 </select>
                 <button class="btn btn-primary btn-sm" onclick="createUser()">添加用户</button>
             </div>
+            <div id="createUserPwBox" class="pw-strength-box" style="display:none"></div>
         </div>
         <table>
             <thead><tr><th>用户名</th><th>角色</th><th>最后登录</th><th>操作</th></tr></thead>
@@ -129,8 +158,8 @@
     </div>
     {% endif %}
 
-    <div class="card" style="margin-bottom:20px;border-color:#3b1f1f">
-        <h2 style="font-size:16px;font-weight:600;margin-bottom:16px;color:#f87171">危险操作</h2>
+    <div class="card card-danger" style="margin-bottom:20px">
+        <h2 class="card-title">危险操作</h2>
         <p style="font-size:13px;color:var(--ink-muted);margin-bottom:16px">重置面板将清除所有面板配置信息（包括账号密码），此操作不可撤销。</p>
         <button class="btn btn-danger" onclick="confirmReset()">一键重置面板</button>
     </div>
@@ -138,6 +167,30 @@
 
 <script>
 // 加载预设市场源到下拉框
+function renderCreateUserPwStrength(pw) {
+    var box = document.getElementById('createUserPwBox');
+    if (!box) return;
+    if (!pw) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    var hasL = /[A-Za-z]/.test(pw), hasD = /\d/.test(pw), hasS = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pw);
+    var level = 'weak';
+    if (pw.length >= 12 && hasL && hasD && hasS) level = 'strong';
+    else if (pw.length >= 8 && hasL && hasD) level = 'medium';
+    var tips = [];
+    if (pw.length < 8) tips.push('建议长度至少8位');
+    if (!hasL) tips.push('建议包含字母');
+    if (!hasD) tips.push('建议包含数字');
+    if (!hasS) tips.push('建议包含特殊字符');
+    if ({password123:1,12345678:1,qwerty123:1,admin123:1,11111111:1}[pw.toLowerCase()]) tips.push('该密码过于常见');
+    if (level === 'strong' && !tips.length) {
+        box.style.display = 'block';
+        box.innerHTML = '<div class="pw-meter"><span class="pw-bar pw-bar-strong"></span></div><div class="pw-hint pw-hint-strong">密码强度：强 ✓</div>';
+        return;
+    }
+    var labels = {weak:'弱', medium:'中', strong:'强'};
+    box.style.display = 'block';
+    box.innerHTML = '<div class="pw-meter"><span class="pw-bar pw-bar-' + level + '"></span></div>' +
+        '<div class="pw-hint pw-hint-' + level + '">密码强度：' + labels[level] + (tips.length ? ' · ' + tips.join('；') : '') + '</div>';
+}
 function loadMarketSources() {
     fetch('/api/market/sources')
         .then(function(r){return r.json()})
@@ -271,7 +324,15 @@ function changePassword() {
     fetch('/api/change-password', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({old_password:oldPw, new_password:newPw}) })
     .then(function(r){return r.json()})
     .then(function(d){
-        if(d.success){ showToast('密码已修改', 'success'); document.getElementById('oldPw').value=''; document.getElementById('newPw').value=''; document.getElementById('newPw2').value=''; }
+        if(d.success){
+            var warn = (d.data||{}).password_warning;
+            if (warn && warn.tips && warn.tips.length) {
+                showToast('密码已修改（提示: ' + warn.tips.join('; ') + '）', 'info');
+            } else {
+                showToast('密码已修改', 'success');
+            }
+            document.getElementById('oldPw').value=''; document.getElementById('newPw').value=''; document.getElementById('newPw2').value='';
+        }
         else { showToast(d.error||'修改失败', 'error'); }
     })
     .catch(function(){ showToast('请求失败', 'error'); });
@@ -300,7 +361,15 @@ function createUser() {
     fetch('/api/users/create', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p, role:r}) })
     .then(function(r){return r.json()})
     .then(function(d){
-        if(d.success){ showToast('用户已创建', 'success'); document.getElementById('newUserName').value=''; document.getElementById('newUserPw').value=''; loadUsers(); }
+        if(d.success){
+            var warn = (d.data||{}).password_warning;
+            if (warn && warn.tips && warn.tips.length) {
+                showToast('用户已创建（密码提示: ' + warn.tips.join('; ') + '）', 'info');
+            } else {
+                showToast('用户已创建', 'success');
+            }
+            document.getElementById('newUserName').value=''; document.getElementById('newUserPw').value=''; loadUsers();
+        }
         else { showToast(d.error||'创建失败', 'error'); }
     })
     .catch(function(){ showToast('请求失败', 'error'); });

@@ -7,8 +7,8 @@
 </div>
 
 <div class="search-bar">
-    <input type="text" id="pluginSearch" placeholder="搜索插件名..." oninput="renderPlugins()">
-    <select id="pluginFilter" onchange="renderPlugins()">
+    <input type="text" id="pluginSearch" placeholder="搜索插件名..." oninput="renderPlugins()" aria-label="搜索插件">
+    <select id="pluginFilter" onchange="renderPlugins()" aria-label="筛选插件状态">
         <option value="all">全部</option>
         <option value="enabled">已启用</option>
         <option value="disabled">已禁用</option>
@@ -18,48 +18,49 @@
 <div id="pluginList" class="plugin-grid"></div>
 
 <!-- Add Plugin Modal -->
-<div class="modal-overlay" id="addPluginModal">
-    <div class="modal">
-        <h2>添加插件</h2>
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="uploadTab">上传插件</button>
-            <button class="tab-btn" data-tab="presetTab">预设插件</button>
-            <button class="tab-btn" data-tab="networkTab">网络安装</button>
+<div class="modal-overlay" id="addPluginModal" role="dialog" aria-modal="true" aria-labelledby="addPluginTitle">
+    <div class="modal modal-lg">
+        <h2 id="addPluginTitle">添加插件</h2>
+        <div class="tabs" role="tablist">
+            <button class="tab-btn active" data-tab="uploadTab" role="tab" aria-selected="true">上传插件</button>
+            <button class="tab-btn" data-tab="presetTab" role="tab" aria-selected="false">预设插件</button>
+            <button class="tab-btn" data-tab="networkTab" role="tab" aria-selected="false">网络安装</button>
         </div>
 
-        <div class="tab-content active" id="uploadTab">
+        <div class="tab-content active" id="uploadTab" role="tabpanel">
             <div class="form-group">
-                <label>上传插件压缩包 (.zip)</label>
-                <input type="file" id="pluginZip" accept=".zip">
+                <label for="pluginZip">上传插件压缩包 (.zip)</label>
+                <input type="file" id="pluginZip" accept=".zip" class="form-control">
             </div>
             <button class="btn btn-primary" onclick="uploadPlugin()">上传并安装</button>
-            <div id="uploadProgress" style="margin-top:8px;font-size:12px;color:var(--text-secondary)"></div>
+            <div id="uploadProgress" class="meta-text" style="margin-top:8px"></div>
         </div>
 
-        <div class="tab-content" id="presetTab">
+        <div class="tab-content" id="presetTab" role="tabpanel">
             <div class="form-group">
-                <input type="text" id="presetSearch" placeholder="搜索预设插件..." oninput="renderPresets()">
+                <label for="presetSearch" class="sr-only">搜索预设插件</label>
+                <input type="text" id="presetSearch" class="form-control" placeholder="搜索预设插件..." oninput="renderPresets()">
             </div>
             <div id="presetList" class="check-list" style="margin-bottom:8px"></div>
-            <div style="display:flex;gap:8px;align-items:center">
-                <label style="font-size:13px"><input type="checkbox" id="selectAllPresets" onchange="toggleAllPresets()"> 全选</label>
+            <div class="form-row" style="align-items:center">
+                <label class="check-label"><input type="checkbox" id="selectAllPresets" onchange="toggleAllPresets()"> 全选</label>
                 <button class="btn btn-success btn-sm" onclick="installPresets()">批量安装</button>
             </div>
         </div>
 
-        <div class="tab-content" id="networkTab">
+        <div class="tab-content" id="networkTab" role="tabpanel">
             <div class="form-group">
-                <label>插件市场源</label>
-                <select id="marketUrl" onchange="onMarketSourceChange()">
+                <label for="marketUrl">插件市场源</label>
+                <select id="marketUrl" class="form-control" onchange="onMarketSourceChange()">
                     <option value="">— 请选择市场源 —</option>
                 </select>
             </div>
             <div class="form-group" id="customMarketUrlGroup" style="display:none">
-                <label>自定义市场源 URL</label>
-                <input type="text" id="customMarketUrl" placeholder="https://pm.tooldelta.top">
+                <label for="customMarketUrl">自定义市场源 URL</label>
+                <input type="text" id="customMarketUrl" class="form-control" placeholder="https://pm.tooldelta.top">
             </div>
             <button class="btn btn-primary btn-sm" onclick="connectMarket()">连接并获取列表</button>
-            <div id="networkPluginList" style="margin-top:12px"></div>
+            <div id="networkPluginList" class="source-info"></div>
         </div>
 
         <div class="modal-actions">
@@ -69,31 +70,31 @@
 </div>
 
 <!-- Plugin Detail Modal -->
-<div class="modal-overlay" id="pluginDetailModal">
-    <div class="modal">
+<div class="modal-overlay" id="pluginDetailModal" role="dialog" aria-modal="true" aria-labelledby="detailName">
+    <div class="modal modal-lg">
         <h2 id="detailName"></h2>
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="detailInfoTab">信息</button>
-            <button class="tab-btn" data-tab="detailConfigTab">配置</button>
-            <button class="tab-btn" data-tab="detailDataTab">数据</button>
-            <button class="tab-btn" data-tab="detailReadmeTab">文档</button>
+        <div class="tabs" role="tablist">
+            <button class="tab-btn active" data-tab="detailInfoTab" role="tab" aria-selected="true">信息</button>
+            <button class="tab-btn" data-tab="detailConfigTab" role="tab" aria-selected="false">配置</button>
+            <button class="tab-btn" data-tab="detailDataTab" role="tab" aria-selected="false">数据</button>
+            <button class="tab-btn" data-tab="detailReadmeTab" role="tab" aria-selected="false">文档</button>
         </div>
-        <div class="tab-content active" id="detailInfoTab"></div>
-        <div class="tab-content" id="detailConfigTab">
-            <div style="display:flex;gap:8px;margin-bottom:10px">
-                <input type="file" id="configUploadInput" style="flex:1">
+        <div class="tab-content active" id="detailInfoTab" role="tabpanel"></div>
+        <div class="tab-content" id="detailConfigTab" role="tabpanel">
+            <div class="form-row" style="margin-bottom:10px">
+                <input type="file" id="configUploadInput" class="form-control" aria-label="上传配置文件">
                 <button class="btn btn-sm btn-primary" onclick="uploadConfigFile()">上传</button>
             </div>
-            <pre id="detailConfig" style="font-size:12px;white-space:pre-wrap;max-height:300px;overflow:auto"></pre>
+            <pre id="detailConfig" class="pre-scroll"></pre>
         </div>
-        <div class="tab-content" id="detailDataTab">
-            <div style="display:flex;gap:8px;margin-bottom:10px">
-                <input type="file" id="dataUploadInput" style="flex:1">
+        <div class="tab-content" id="detailDataTab" role="tabpanel">
+            <div class="form-row" style="margin-bottom:10px">
+                <input type="file" id="dataUploadInput" class="form-control" aria-label="上传数据文件">
                 <button class="btn btn-sm btn-primary" onclick="uploadDataFile()">上传</button>
             </div>
             <div id="detailDataList"></div>
         </div>
-        <div class="tab-content" id="detailReadmeTab"><div id="detailReadme" style="font-size:13px;max-height:300px;overflow:auto"></div></div>
+        <div class="tab-content" id="detailReadmeTab" role="tabpanel"><div id="detailReadme" class="pre-scroll" style="font-size:13px"></div></div>
         <div class="modal-actions">
             <button class="btn btn-outline" onclick="closeModal('pluginDetailModal')">关闭</button>
         </div>
@@ -152,7 +153,7 @@ function renderPlugins() {
     });
     var container = document.getElementById('pluginList');
     if (list.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">---</div>暂无插件</div>';
+        container.innerHTML = '<div class="empty-state"><div class="icon" aria-hidden="true">🧩</div>暂无插件</div>';
         return;
     }
     container.innerHTML = list.map(function(p) {
@@ -222,7 +223,7 @@ function renderPresets() {
     var q = document.getElementById('presetSearch').value.toLowerCase();
     var list = allPresets.filter(function(p) { return p.name.toLowerCase().indexOf(q) !== -1 || p.id.toLowerCase().indexOf(q) !== -1; });
     document.getElementById('presetList').innerHTML = list.map(function(p) {
-        return '<label><input type="checkbox" class="preset-cb" value="' + p.id + '"> ' + p.name + ' <span style="color:var(--text-secondary)">v' + p.version + ' | ' + p.author + '</span></label>';
+        return '<label><input type="checkbox" class="preset-cb" value="' + p.id + '"> ' + p.name + ' <span style="color:var(--ink-subtle)">v' + p.version + ' | ' + p.author + '</span></label>';
     }).join('');
 }
 
@@ -255,7 +256,7 @@ function connectMarket() {
             if (!d.success) { container.innerHTML = '<div style="color:var(--danger)">连接失败: ' + d.error + '</div>'; return; }
             container.innerHTML = '<div style="font-size:13px;margin-bottom:8px">' + d.source_name + ' - ' + d.plugins.length + ' 个插件</div>' +
                 '<div class="check-list">' + d.plugins.map(function(p) {
-                    return '<label><input type="checkbox" class="net-cb" value="' + p.id + '" data-url="' + url + '"> ' + p.name + ' <span style="color:var(--text-secondary)">v' + p.version + ' | ' + p.author + '</span></label>';
+                    return '<label><input type="checkbox" class="net-cb" value="' + p.id + '" data-url="' + url + '"> ' + p.name + ' <span style="color:var(--ink-subtle)">v' + p.version + ' | ' + p.author + '</span></label>';
                 }).join('') + '</div>' +
                 '<button class="btn btn-success btn-sm" style="margin-top:8px" onclick="installNetwork()">安装选中插件</button>';
         });
@@ -311,7 +312,7 @@ function showPluginDetail(name) {
     fetch('/api/plugins/readme?name=' + name)
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            if (d.error) document.getElementById('detailReadme').innerHTML = '<div style="font-size:13px;color:var(--text-secondary)">无文档</div>';
+            if (d.error) document.getElementById('detailReadme').innerHTML = '<div style="font-size:13px;color:var(--ink-subtle)">无文档</div>';
             else document.getElementById('detailReadme').innerHTML = '<pre style="font-size:12px;white-space:pre-wrap">' + d.content + '</pre>';
         });
 }

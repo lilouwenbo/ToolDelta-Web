@@ -1,8 +1,15 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, session
 
 from app.scheduler_service import scheduler_service
 
 bp = Blueprint("scheduler", __name__)
+
+
+def _admin_required():
+    """校验当前会话是否为管理员，非管理员返回错误响应。"""
+    if session.get("role") != 10:
+        return jsonify({"success": False, "message": "无权限，仅管理员可操作"}), 403
+    return None
 
 
 @bp.route("/scheduler")
@@ -17,6 +24,9 @@ def api_jobs():
 
 @bp.route("/api/scheduler/add", methods=["POST"])
 def api_add():
+    err = _admin_required()
+    if err:
+        return err
     payload = request.get_json(silent=True) or {}
     try:
         job = scheduler_service.add_job(payload)
@@ -29,6 +39,9 @@ def api_add():
 
 @bp.route("/api/scheduler/update", methods=["POST"])
 def api_update():
+    err = _admin_required()
+    if err:
+        return err
     payload = request.get_json(silent=True) or {}
     job_id = payload.get("id")
     if not job_id:
@@ -46,6 +59,9 @@ def api_update():
 
 @bp.route("/api/scheduler/delete", methods=["POST"])
 def api_delete():
+    err = _admin_required()
+    if err:
+        return err
     payload = request.get_json(silent=True) or {}
     job_id = payload.get("id")
     if not job_id:
@@ -58,6 +74,9 @@ def api_delete():
 
 @bp.route("/api/scheduler/run", methods=["POST"])
 def api_run():
+    err = _admin_required()
+    if err:
+        return err
     payload = request.get_json(silent=True) or {}
     job_id = payload.get("id")
     if not job_id:

@@ -79,8 +79,9 @@ document.addEventListener('click', function(e) {
     if (!tabBtn) return;
     var tabId = tabBtn.getAttribute('data-tab');
     var parent = tabBtn.closest('.modal') || tabBtn.closest('.card') || document;
-    parent.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+    parent.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
     tabBtn.classList.add('active');
+    tabBtn.setAttribute('aria-selected', 'true');
     parent.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
     var target = document.getElementById(tabId);
     if (target) target.classList.add('active');

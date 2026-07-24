@@ -57,15 +57,38 @@ def validate_username(username):
     return True, ""
 
 def validate_password(password):
-    if not isinstance(password, str) or len(password) < 8 or len(password) > 64:
-        return False, "密码长度需8-64位"
-    # 基础复杂度：至少包含一个字母和一个数字，避免纯数字/纯字母弱口令（P1-2）
-    if not re.search(r"[A-Za-z]", password) or not re.search(r"\d", password):
-        return False, "密码需同时包含字母和数字"
-    # 拒绝常见连续/重复弱口令（保留测试用例 admin123 的兼容性）
-    if password.lower() in ("password123", "12345678", "qwerty123"):
-        return False, "密码过于常见"
+    """校验密码基本格式（长度上限），弱密码仅返回警告不阻止创建。"""
+    if not isinstance(password, str) or len(password) < 1 or len(password) > 64:
+        return False, "密码长度需1-64位"
     return True, ""
+
+def check_password_strength(password):
+    """检查密码强度，返回 (level, tips)。
+    level: 'strong' | 'medium' | 'weak'
+    tips: 改进建议列表
+    弱密码仅提示，不阻止创建账号。
+    """
+    tips = []
+    if not isinstance(password, str) or not password:
+        return "weak", ["密码不能为空"]
+    if len(password) < 8:
+        tips.append("建议密码长度至少8位")
+    has_letter = bool(re.search(r"[A-Za-z]", password))
+    has_digit = bool(re.search(r"\d", password))
+    has_special = bool(re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>/?]", password))
+    if not has_letter:
+        tips.append("建议包含字母")
+    if not has_digit:
+        tips.append("建议包含数字")
+    if not has_special:
+        tips.append("建议包含特殊字符可增强安全性")
+    if password.lower() in ("password123", "12345678", "qwerty123", "admin123", "11111111"):
+        tips.append("该密码过于常见，极易被破解")
+    if len(password) >= 12 and has_letter and has_digit and has_special:
+        return "strong", tips if tips else []
+    if len(password) >= 8 and has_letter and has_digit:
+        return "medium", tips
+    return "weak", tips
 
 def is_configured():
     users = _read()

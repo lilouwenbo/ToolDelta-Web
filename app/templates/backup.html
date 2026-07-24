@@ -4,14 +4,14 @@
 <div class="page-header">
     <h1>备份与恢复</h1>
     <div>
-        <button class="btn btn-primary" onclick="createBackup()">创建备份</button>
+        <button class="btn btn-primary" id="btnCreate" onclick="createBackup()">创建备份</button>
         <button class="btn btn-danger" onclick="showFactoryReset()">恢复出厂设置</button>
     </div>
 </div>
 
 <div class="card">
     <h3>说明</h3>
-    <p style="font-size:13px;color:var(--ink-subtle)">备份将保存 插件文件、插件配置文件、插件数据文件和 ToolDelta 基本配置。恢复出厂设置将清空所有插件、配置和数据。</p>
+    <p class="notice">备份将保存 插件文件、插件配置文件、插件数据文件和 ToolDelta 基本配置。恢复出厂设置将清空所有插件、配置和数据。</p>
 </div>
 
 <div id="backupList"></div>
@@ -25,25 +25,30 @@ function loadBackups() {
         .then(function(backups) {
             var container = document.getElementById('backupList');
             if (backups.length === 0) {
-                container.innerHTML = '<div class="empty-state"><div class="icon">---</div>暂无备份</div>';
+                container.innerHTML = '<div class="empty-state"><div class="icon" aria-hidden="true">💾</div>暂无备份</div>';
                 return;
             }
             container.innerHTML = backups.map(function(b) {
-                return '<div class="card" style="display:flex;justify-content:space-between;align-items:center">' +
+                return '<div class="backup-item">' +
                     '<div><strong>' + b.name + '</strong>' +
-                    '<div style="font-size:12px;color:var(--ink-subtle);margin-top:4px">' + b.time + ' | ' + (b.size / 1024).toFixed(1) + ' KB</div></div>' +
-                    '<div style="display:flex;gap:8px">' +
+                    '<div class="backup-meta">' + b.time + ' | ' + (b.size / 1024).toFixed(1) + ' KB</div></div>' +
+                    '<div class="backup-actions">' +
                     '<button class="btn btn-sm btn-primary" onclick="restoreBackup(\'' + b.zip + '\')">还原</button>' +
                     '<button class="btn btn-sm btn-danger" onclick="deleteBackup(\'' + b.zip + '\')">删除</button></div></div>';
             }).join('');
-        });
+        })
+        .catch(function() { showToast('加载备份列表失败', 'error'); });
 }
 
 function createBackup() {
     var name = prompt('备份名称（可选）:');
+    var btn = document.getElementById('btnCreate');
+    if (btn) { btn.disabled = true; }
     fetch('/api/backup/create', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name: name || undefined}) })
         .then(function(r) { return r.json(); })
-        .then(function(d) { showToast('备份创建成功: ' + d.name, 'success'); loadBackups(); });
+        .then(function(d) { showToast('备份创建成功: ' + d.name, 'success'); loadBackups(); })
+        .catch(function() { showToast('备份创建失败', 'error'); })
+        .finally(function() { if (btn) { btn.disabled = false; } });
 }
 
 function restoreBackup(zip) {
@@ -51,7 +56,8 @@ function restoreBackup(zip) {
         if (!ok) return;
         fetch('/api/backup/restore', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({zip: zip}) })
             .then(function(r) { return r.json(); })
-            .then(function(d) { showToast(d.success ? '还原成功' : '还原失败: ' + d.message, d.success ? 'success' : 'error'); });
+            .then(function(d) { showToast(d.success ? '还原成功' : '还原失败: ' + d.message, d.success ? 'success' : 'error'); })
+            .catch(function() { showToast('还原请求失败', 'error'); });
     });
 }
 
@@ -59,7 +65,8 @@ function deleteBackup(zip) {
     showConfirm('确定删除此备份？', function(ok) {
         if (!ok) return;
         fetch('/api/backup/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({zip: zip}) })
-            .then(function() { showToast('已删除', 'info'); loadBackups(); });
+            .then(function() { showToast('已删除', 'info'); loadBackups(); })
+            .catch(function() { showToast('删除请求失败', 'error'); });
     });
 }
 
@@ -69,7 +76,8 @@ function showFactoryReset() {
         showConfirm('再次确认：此操作不可撤销！', function(ok2) {
             if (!ok2) return;
             fetch('/api/reset', { method:'POST' })
-                .then(function() { showToast('已恢复出厂设置', 'success'); });
+                .then(function() { showToast('已恢复出厂设置', 'success'); })
+                .catch(function() { showToast('恢复出厂设置失败', 'error'); });
         });
     });
 }

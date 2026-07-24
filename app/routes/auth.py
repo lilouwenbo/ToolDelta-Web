@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, jsonify, session, redirec
 from app import auth_service
 from app.log_service import log_service
 from app import wallpaper_service as wp_service
+import time
 
 bp = Blueprint("auth", __name__)
 
@@ -53,14 +54,22 @@ def setup():
     if not valid:
         auth_service.record_login_fail(ip)
         return fail(msg)
+    # 弱密码仅提示，不阻止创建
+    level, tips = auth_service.check_password_strength(password)
     auth_service.setup_user(username, password)
     auth_service.clear_login_fails(ip)
+    # 会话固定防护：登录前清空旧 session，强制服务端生成新 session id
+    session.clear()
     session["authenticated"] = True
     session["username"] = username
     session["role"] = 10
+    session["auth_at"] = time.time()
     session.permanent = True
     audit("初始化面板", f"用户={username}")
-    return ok()
+    data = {}
+    if level != "strong" and tips:
+        data["password_warning"] = {"level": level, "tips": tips}
+    return ok(data)
 
 @bp.route("/api/login", methods=["POST"])
 def login():
@@ -81,9 +90,12 @@ def login():
     if user:
         auth_service.clear_login_fails(ip)
         auth_service.update_login_time(username)
+        # 会话固定防护：登录前清空旧 session，强制服务端生成新 session id
+        session.clear()
         session["authenticated"] = True
         session["username"] = username
         session["role"] = user.get("role", 1)
+        session["auth_at"] = time.time()
         session.permanent = True
         audit("登录", f"用户={username}")
         return ok()
@@ -105,7 +117,11 @@ def change_password():
     ok_, err = auth_service.change_password(username, old_pw, new_pw)
     if ok_:
         audit("修改密码", f"用户={username}")
-        return ok()
+        level, tips = auth_service.check_password_strength(new_pw)
+        data = {}
+        if level != "strong" and tips:
+            data["password_warning"] = {"level": level, "tips": tips}
+        return ok(data)
     return fail(err)
 
 @bp.route("/api/reset-panel", methods=["POST"])
@@ -176,7 +192,12 @@ def create_user():
     ok_, err = auth_service.create_user(username, password, role)
     if ok_:
         audit("创建用户", f"用户名={username} 角色={role}")
-        return ok()
+        # 弱密码仅提示，不阻止创建
+        level, tips = auth_service.check_password_strength(password)
+        data = {}
+        if level != "strong" and tips:
+            data["password_warning"] = {"level": level, "tips": tips}
+        return ok(data)
     return fail(err)
 
 @bp.route("/api/users/delete", methods=["POST"])
