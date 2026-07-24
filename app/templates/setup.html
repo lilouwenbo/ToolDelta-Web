@@ -100,7 +100,7 @@
             } else if (STEP === 2) {
                 panel.innerHTML = '<h2>管理员账号</h2>' +
                     '<p class="sub">设置用于登录管理面板的账号与密码（首次初始化必需，弱密码仅提示不阻止创建）。</p>' +
-                    '<div class="form-group"><label>用户名</label><input type="text" id="username" placeholder="设置用户名" value="' + esc(data.username) + '"></div>' +
+                    '<div class="form-group"><label>用户名</label><input type="text" id="username" placeholder="设置用户名（支持中文，1-32位）" value="' + esc(data.username) + '"></div>' +
                     '<div class="form-group"><label>密码</label><input type="password" id="password" placeholder="设置密码（1-64 位，建议8位以上）" value="' + esc(data.password) + '" oninput="renderPwStrength(this.value)"></div>' +
                     '<div id="pwStrengthBox" class="pw-strength-box" style="display:none"></div>' +
                     '<div class="form-group"><label>确认密码</label><input type="password" id="password2" placeholder="再次输入密码"></div>';

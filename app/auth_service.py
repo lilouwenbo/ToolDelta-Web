@@ -46,14 +46,15 @@ def _write_locked(users):
         json.dump(users, f, indent=2, ensure_ascii=False)
     os.replace(tmp, USER_FILE)
 
-# 用户名规则：字母/数字/下划线/连字符，长度 1-32，避免控制字符或路径遍历（P1-2）
-_USERNAME_RE = re.compile(r"^[A-Za-z0-9_\-]{1,32}$")
+# 用户名规则：字母/数字/下划线/连字符/中文，长度 1-32，避免控制字符或路径遍历（P1-2）
+# 支持中文（CJK统一表意文字范围），不允许全为空白或纯标点
+_USERNAME_RE = re.compile(r"^[A-Za-z0-9_\-\u4e00-\u9fff\u3400-\u4dbf]{1,32}$")
 
 def validate_username(username):
     if not isinstance(username, str):
         return False, "用户名必须是字符串"
     if not _USERNAME_RE.match(username):
-        return False, "用户名需为1-32位字母、数字、下划线或连字符"
+        return False, "用户名需为1-32位字母、数字、下划线、连字符或中文"
     return True, ""
 
 def validate_password(password):

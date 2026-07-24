@@ -1,46 +1,46 @@
 {% extends "base.html" %}
 {% block content %}
 <div style="max-width:640px;margin:0 auto">
-    <h1 style="font-size:22px;font-weight:600;margin-bottom:24px">面板设置</h1>
+    <h1 class="page-title">面板设置</h1>
 
     <div class="card" style="margin-bottom:20px">
-        <h2 style="font-size:16px;font-weight:600;margin-bottom:16px">面板壁纸</h2>
-        <p style="font-size:13px;color:var(--ink-muted);margin-bottom:12px">设置后每次打开面板都会看到这张壁纸，不会自动更换。点击「换一张」随机切换。</p>
-        <div id="wallpaperPreview" style="width:100%;height:140px;border-radius:8px;background:var(--canvas);border:1px solid var(--border);margin-bottom:12px;background-size:cover;background-position:center{% if wallpaper_url %};background-image:url('{{ wallpaper_url }}'){% endif %}"></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <h2 class="card-title">面板壁纸</h2>
+        <p class="help-text">设置后每次打开面板都会看到这张壁纸，不会自动更换。点击「随机壁纸」随机切换。</p>
+        <div id="wallpaperPreview" class="wallpaper-preview"{% if wallpaper_url %} style="background-image:url('{{ wallpaper_url }}')"{% endif %}></div>
+        <div class="form-row" style="flex-wrap:wrap">
             <button class="btn btn-primary" onclick="fetchWallpaper()">随机壁纸</button>
             <button class="btn btn-outline" onclick="clearWallpaper()">清除壁纸</button>
         </div>
-        <div style="margin-top:10px;display:flex;gap:8px">
-            <input type="text" id="manualWallpaperUrl" placeholder="或输入图片URL..." style="flex:1;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:13px;outline:none">
+        <div class="form-row" style="margin-top:10px">
+            <input type="text" id="manualWallpaperUrl" class="form-control" placeholder="或输入图片URL...">
             <button class="btn btn-sm btn-outline" onclick="setManualWallpaper()">应用</button>
         </div>
-        <div id="wallpaperError" style="color:#f87171;font-size:12px;margin-top:6px;display:none"></div>
+        <div id="wallpaperError" class="form-hint" style="color:var(--danger);display:none;margin-top:6px"></div>
     </div>
 
     <div class="card" style="margin-bottom:20px">
-        <h2 style="font-size:16px;font-weight:600;margin-bottom:16px">版本信息</h2>
-        <div style="font-size:13px;color:var(--ink-muted);line-height:1.9">
-            <div>Web 面板版本：<span style="color:var(--ink)">{{ versions.web_version }}</span></div>
-            <div>ToolDelta 版本：<span style="color:var(--ink)">{{ versions.tooldelta_version }}</span></div>
-            <div>构建哈希：<span style="color:var(--ink)">{{ versions.build_hash }}</span></div>
+        <h2 class="card-title">版本信息</h2>
+        <div class="version-info">
+            <div>Web 面板版本：<span class="version-val">{{ versions.web_version }}</span></div>
+            <div>ToolDelta 版本：<span class="version-val">{{ versions.tooldelta_version }}</span></div>
+            <div>构建哈希：<span class="version-val">{{ versions.build_hash }}</span></div>
         </div>
     </div>
 
     <div class="card" style="margin-bottom:20px">
         <h2 class="card-title">修改密码</h2>
-        <div class="form-group" style="margin-bottom:12px">
-            <label class="form-label">当前密码</label>
+        <div class="form-group">
+            <label class="form-label" for="oldPw">当前密码</label>
             <input type="password" id="oldPw" class="form-control">
         </div>
-        <div class="form-group" style="margin-bottom:12px">
-            <label class="form-label">新密码</label>
+        <div class="form-group">
+            <label class="form-label" for="newPw">新密码</label>
             <input type="password" id="newPw" class="form-control" oninput="renderSettingsPwStrength(this.value)">
             <span class="form-hint">密码长度1-64位，建议8位以上并包含字母、数字、特殊字符；弱密码仅提示不阻止修改。</span>
             <div id="settingsPwBox" class="pw-strength-box" style="display:none;margin-top:8px"></div>
         </div>
-        <div class="form-group" style="margin-bottom:12px">
-            <label class="form-label">确认新密码</label>
+        <div class="form-group">
+            <label class="form-label" for="newPw2">确认新密码</label>
             <input type="password" id="newPw2" class="form-control">
         </div>
         <button class="btn btn-primary" onclick="changePassword()">修改密码</button>

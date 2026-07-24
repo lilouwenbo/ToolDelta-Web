@@ -57,6 +57,16 @@ function appendLine(html) {
 
 var _sendingCmd = false;
 
+// 供移动端「发送」按钮调用：读取输入框并发送
+function sendConsoleInput() {
+    if (!input) return;
+    var cmd = input.value;
+    input.value = '';
+    histIdx = -1;
+    sendCommand(cmd);
+    input.focus();
+}
+
 function sendCommand(cmd) {
     cmd = (cmd || '').trim();
     if (!cmd) return;
@@ -142,7 +152,8 @@ socket.on('console_output', function (data) { appendLine(data.data_html || data.
 
 if (input) {
     input.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') {
+        // 兼容 Android 键盘：部分输入法回车键 e.key 为 'Enter' 但部分为 keyCode 13
+        if (e.key === 'Enter' || e.keyCode === 13) {
             var cmd = input.value;
             input.value = '';
             histIdx = -1;

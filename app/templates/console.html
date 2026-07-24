@@ -17,6 +17,7 @@
     <div class="console-body" id="consoleBody" role="log" aria-live="polite" aria-label="控制台输出" tabindex="0"></div>
     <div class="console-foot">
         <input id="consoleInput" placeholder="输入命令...（↑/↓ 翻历史，Tab 补全）" autocomplete="off" aria-label="命令输入">
+        <button class="console-send-btn" onclick="sendConsoleInput()" aria-label="发送命令">发送</button>
     </div>
 </div>
 
@@ -76,6 +77,14 @@
   color:var(--console-fg); font-size:13px; font-family:inherit; outline:none;
 }
 .console-foot input::placeholder { color: var(--ink-tertiary); }
+.console-send-btn {
+  padding: 12px 16px; border: none; cursor: pointer;
+  background: var(--primary); color: var(--ink);
+  font-size: 14px; font-weight: 500;
+  transition: background .15s;
+}
+.console-send-btn:hover { background: var(--primary-hover); }
+.console-send-btn:active { background: var(--primary); }
 </style>
 {% endblock %}
 

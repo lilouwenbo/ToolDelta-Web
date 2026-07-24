@@ -556,9 +556,24 @@ class ToolDeltaManager:
             self.running = False
             self._broadcast("system", "ToolDelta 进程已退出")
             return
+        # 使用 select + 超时机制：当子进程输出不含换行的片段（如 "请选择: "）
+        # 时，旧逻辑会阻塞在 os.read 等待更多数据，导致用户必须再输入一次才能看到
+        # 残留输出。此处改为：有数据就读、按行 emit；150ms 内无新数据但有残留
+        # 缓冲时，立即把不完整行 flush 出去，让 Web 端实时看到提示符/进度。
+        import select as _select
         buf = b""
+        fd = pty_master if pty_master is not None else (stdout.fileno() if stdout and hasattr(stdout, "fileno") else None)
         while self.running and proc and proc.poll() is None:
             try:
+                if fd is not None:
+                    # 最多等待 150ms：有数据就立即读，超时则 flush 残留缓冲
+                    ready, _, _ = _select.select([fd], [], [], 0.15)
+                    if not ready:
+                        # 超时且有残留不完整行：立即 flush，避免提示符卡住不显示
+                        if buf:
+                            self._emit_line(self._decode_line(buf))
+                            buf = b""
+                        continue
                 if pty_master is not None:
                     chunk = os.read(pty_master, 4096)
                 elif stdout is not None:

@@ -672,6 +672,60 @@ hr {
   .modal { width: 95%; padding: 20px; max-height: 85vh; }
 }
 
+/* ─── Android / 移动端深度适配 ─── */
+@media (max-width: 768px) {
+  /* 输入框字号设为 16px：防止 iOS/Android 聚焦时自动缩放页面 */
+  .form-control, input[type="text"], input[type="password"], input[type="number"],
+  input[type="search"], select, textarea {
+    font-size: 16px !important;
+  }
+  /* 控制台输出区：移动端缩短高度并使用更小字号 */
+  .console-body { height: 300px; font-size: 12px; }
+  .console-foot input { font-size: 16px; }
+  /* 触控目标最小 44px（Android Material 设计规范） */
+  .btn { min-height: 40px; }
+  .btn-sm { min-height: 36px; }
+  /* 表格行间距加大，便于触控滚动 */
+  .table tbody td { padding: 10px 8px; }
+  /* 模态框竖向滚动：避免移动端内容超出视口 */
+  .modal-overlay { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 20px 0; }
+  .modal { max-width: 94% !important; }
+  /* form-row 在窄屏堆叠 */
+  .form-row { flex-direction: column; gap: 0; }
+  .form-row .form-group { flex: 1 1 auto; margin-bottom: 14px; }
+  .form-group--narrow { flex: 1 1 auto; }
+  /* 页面标题缩小 */
+  .page-header h1 { font-size: 20px; }
+  /* 状态卡网格：2 列以节省纵向空间 */
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* 超窄屏（≤400px，小屏 Android 手机） */
+@media (max-width: 400px) {
+  .main-content { padding: 56px 8px 12px; }
+  .stat-grid { grid-template-columns: 1fr; }
+  .console-body { height: 240px; font-size: 11px; }
+  .modal { padding: 16px; }
+  .page-header h1 { font-size: 18px; }
+  .card { padding: 12px; }
+}
+
+/* 安全区适配：刘海屏 / 全面屏底部 home indicator */
+@supports (padding: max(0px)) {
+  .sidebar-footer { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+  .main-content { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+}
+
+/* 移动端控制台输入框：禁用自动大写/自动纠正，提升命令输入体验 */
+#consoleInput {
+  -webkit-autocapitalize: off;
+  autocapitalize: off;
+  -webkit-autocorrect: off;
+  autocorrect: off;
+  -webkit-spell-check: off;
+  spellcheck: false;
+}
+
 /* ─── UI 升级：参考 easynode 设计语言 ─── */
 
 /* 金色渐变 logo 与品牌名（参照 easynode 金色 #ffc021 → #e4d1a1） */
@@ -1481,3 +1535,17 @@ label.form-label {
 }
 .meta-text { font-size: 13px; color: var(--ink-subtle); margin-bottom: 8px; }
 .source-info { margin-top: 8px; }
+
+/* ─── 设置页：壁纸预览 / 版本信息 / 页面标题 ─── */
+.page-title {
+  font-size: 22px; font-weight: 600; margin-bottom: 24px; color: var(--ink);
+}
+.wallpaper-preview {
+  width: 100%; height: 140px; border-radius: var(--r-md);
+  background: var(--surface-1); border: 1px solid var(--hairline);
+  margin-bottom: 12px; background-size: cover; background-position: center;
+}
+.version-info {
+  font-size: 13px; color: var(--ink-muted); line-height: 1.9;
+}
+.version-val { color: var(--ink); }

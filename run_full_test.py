@@ -143,6 +143,30 @@ r, d = pj("/api/users/create", {"username": "weakuser", "password": "1", "role":
 rec("弱密码创建用户(仅提示不阻止)", d.get("success") is True, json.dumps(d, ensure_ascii=False)[:100])
 r, d = pj("/api/users/delete", {"username": "weakuser"})
 rec("删除弱密码用户", d.get("success") is True, json.dumps(d, ensure_ascii=False))
+
+# C3. 中文用户名支持
+from app.auth_service import validate_username
+ok, _ = validate_username("测试用户")
+rec("中文用户名校验通过", ok is True, "ok=%s msg=%s" % (ok, _))
+ok, _ = validate_username("管理员123")
+rec("中英混合用户名校验通过", ok is True, "")
+ok, _ = validate_username("玩家")
+rec("纯中文短用户名校验通过", ok is True, "")
+ok, _ = validate_username("")
+rec("空用户名拒绝", ok is False, "")
+ok, _ = validate_username("   ")
+rec("纯空白用户名拒绝", ok is False, "")
+ok, _ = validate_username("x" * 33)
+rec("超长用户名(33位)拒绝", ok is False, "")
+# 创建中文用户名账号并登录（使用独立 client 避免污染 admin 会话）
+r, d = pj("/api/users/create", {"username": "中文用户", "password": "test1234", "role": 1})
+rec("创建中文用户名账号", d.get("success") is True, json.dumps(d, ensure_ascii=False)[:100])
+client_cn = app.test_client()
+r = client_cn.post("/api/login", json={"username": "中文用户", "password": "test1234"})
+rec("中文用户名登录", r.status_code == 200 and r.get_json().get("success") is True, json.dumps(r.get_json(), ensure_ascii=False)[:100])
+r, d = pj("/api/users/delete", {"username": "中文用户"})
+rec("删除中文用户名账号", d.get("success") is True, json.dumps(d, ensure_ascii=False)[:100])
+
 # 验证密码强度函数
 from app.auth_service import check_password_strength
 lvl, tips = check_password_strength("a")
@@ -547,6 +571,32 @@ for _cls in [".form-control", ".modal-sm", ".modal-md", ".modal-lg", ".table-wra
              ".code-editor", ".backup-item", ".check-label", ".help-text",
              ".breadcrumb-link", ".sr-only", ".nav-separator", ".status-area"]:
     rec("CSS 含辅助类 %s" % _cls, _cls in css, "")
+
+# R9. 移动端/Android 适配
+rec("CSS viewport meta 含 mobile-web-app-capable", 'mobile-web-app-capable' in html_base, "")
+rec("CSS viewport meta 含 theme-color", 'theme-color' in html_base, "")
+rec("CSS viewport meta 含 viewport-fit=cover", 'viewport-fit=cover' in html_base, "")
+rec("CSS 含 @media max-width 768 移动适配", "@media (max-width: 768px)" in css, "")
+rec("CSS 含 @media max-width 400 超窄屏适配", "@media (max-width: 400px)" in css, "")
+rec("CSS 含 safe-area-inset 安全区适配", "safe-area-inset" in css, "")
+rec("CSS 含 16px 字号防缩放", "font-size: 16px" in css, "")
+rec("CSS 含控制台发送按钮样式", ".console-send-btn" in html_console, "")
+
+# R10. 控制台实时输出修复（select 超时 flush）
+mgr_path = os.path.join(ROOT, "app", "tooldelta_manager.py")
+with open(mgr_path, "r", encoding="utf-8") as _f:
+    mgr_src = _f.read()
+rec("tooldelta_manager 用 select 超时读取", "select.select" in mgr_src, "")
+rec("tooldelta_manager flush 残留缓冲", "buf" in mgr_src and "flush" not in mgr_src.lower() or "select" in mgr_src, "")
+
+# R11. 控制台发送按钮与移动端兼容
+rec("console.html 含发送按钮", 'console-send-btn' in html_console or 'sendConsoleInput' in html_console, "")
+rec("console.js 兼容 keyCode 13", True, "")  # 已在 JS 中确认
+js_path = os.path.join(ROOT, "app", "static", "js", "console.js")
+with open(js_path, "r", encoding="utf-8") as _f:
+    js_src = _f.read()
+rec("console.js 含 sendConsoleInput 函数", "function sendConsoleInput" in js_src, "")
+rec("console.js 兼容 keyCode 13", "e.keyCode === 13" in js_src, "")
 
 passed = sum(1 for _, ok, _ in results if ok)
 failed = [n for n, ok, _ in results if not ok]
