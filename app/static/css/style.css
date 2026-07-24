@@ -304,6 +304,12 @@ pre { white-space: pre-wrap; word-break: break-all; }
   contain: layout style paint;
 }
 .stat-card:hover { border-color: var(--hairline-strong); }
+/* 卡片 hover 微交互：轻微上浮 + 阴影增强，参考 core-stack-org 150-250ms 微交互。
+   仅在 hover-capable 设备启用，触屏设备避免残留状态。 */
+@media (hover: hover) {
+  .stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+  .plugin-card:hover { transform: translateY(-1px); }
+}
 .stat-card .stat-header {
   display: flex;
   align-items: center;
@@ -369,6 +375,23 @@ a.btn { color: inherit; }
 .btn-outline:hover { background: var(--surface-2); color: var(--ink); border-color: var(--hairline-strong); }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* 按钮 loading 状态：内嵌 spinner，参考 calmops button loading state。
+   position: relative 让 ::before 定位在文字左侧，保留原文本避免布局抖动。 */
+.btn-loading { position: relative; opacity: 0.7; }
+.btn-loading::before {
+  content: '';
+  display: inline-block;
+  width: 14px; height: 14px;
+  margin-right: 6px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: btn-spin 0.6s linear infinite;
+  opacity: 0.7;
+}
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .btn-loading::before { animation: none; } }
 
 /* ─── Console ─── */
 
@@ -580,6 +603,27 @@ tr:hover td { background: var(--surface-2); }
   opacity: 0.6; transition: opacity .15s;
 }
 .toast .toast-close:hover { opacity: 1; color: var(--ink); }
+/* toast action 按钮（如重试），参考 figr.design toast retry button */
+.toast .toast-action {
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: var(--ink);
+  padding: 3px 10px;
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-left: 8px;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.toast .toast-action:hover { background: rgba(255,255,255,0.2); }
+/* 浅色主题下 action 按钮背景适配 */
+[data-theme="light"] .toast .toast-action {
+  background: rgba(0,0,0,0.06);
+  border-color: rgba(0,0,0,0.12);
+}
+[data-theme="light"] .toast .toast-action:hover { background: rgba(0,0,0,0.1); }
 .toast .toast-bar {
   display: block; height: 3px; width: 100%;
   background: rgba(255,255,255,0.12); margin-top: 6px;
@@ -665,7 +709,7 @@ th[role="button"]:focus-visible {
 .cmd-row .hint { color: var(--warning); min-width: 100px; }
 .cmd-row .usage { color: var(--ink-subtle); flex: 1; }
 
-/* ─── Empty state ─── */
+/* ─── Empty state（参考 GitHub Primer Blankslate：图标+标题+说明+行动按钮） ─── */
 
 .empty-state {
   text-align: center;
@@ -673,6 +717,63 @@ th[role="button"]:focus-visible {
   color: var(--ink-subtle);
 }
 .empty-state .icon { font-size: 36px; margin-bottom: 12px; opacity: 0.4; }
+
+/* 离线横幅：参考 koder.ai offline state —— 顶部持续提示条，恢复后滑出消失 */
+.offline-banner {
+  background: var(--warning);
+  color: #000;
+  text-align: center;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--r-md);
+  margin-bottom: 16px;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.offline-banner.visible { opacity: 1; transform: translateY(0); }
+/* 错误变体：图标用危险色，提示更醒目（参考 Primer error variation） */
+.empty-state-error .icon { opacity: 0.7; color: var(--danger); }
+.empty-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.empty-hint { font-size: 13px; color: var(--ink-subtle); margin-bottom: 16px; }
+/* 空状态内的重试按钮与按钮组间距 */
+.empty-state .btn { margin-top: 4px; }
+/* 空状态入场动画：淡入上移，参考 core-stack-org 微交互 150-250ms */
+.empty-state { animation: emptyFadeIn 0.2s ease-out; }
+@keyframes emptyFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 列表骨架屏（参考 Primer SkeletonBox / calmops skeleton screens）：
+   mimic 真实卡片布局，避免内容加载时的布局抖动，提升感知性能。 */
+.skeleton-list { display: flex; flex-direction: column; gap: 12px; }
+.skeleton-card {
+  height: 88px;
+  border-radius: var(--r-lg);
+  background: linear-gradient(90deg,
+    var(--surface-1) 25%,
+    var(--surface-3) 50%,
+    var(--surface-1) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border: 1px solid var(--hairline);
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) { .skeleton-card { animation: none; } }
 
 /* ─── Spinner ─── */
 
@@ -1910,7 +2011,7 @@ label.form-label {
   margin-top: 6px; line-height: 1.5;
 }
 
-/* ─── 骨架屏加载占位（shimmer 动画） ─── */
+/* ─── 骨架屏加载占位（shimmer 动画，@keyframes shimmer 见 line 772 统一定义） ─── */
 .skeleton {
   background: linear-gradient(90deg,
     var(--surface-2) 25%,
@@ -1923,11 +2024,6 @@ label.form-label {
 }
 .skeleton-line { height: 14px; margin-bottom: 8px; }
 .skeleton-line.short { width: 60%; }
-.skeleton-card { padding: 16px; border-radius: var(--r-md); margin-bottom: 12px; }
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
 
 /* ─── 插件/市场卡片 hover 增强（与 stat-card 视觉一致） ─── */
 .plugin-card, .market-card {

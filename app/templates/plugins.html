@@ -114,13 +114,19 @@ function _esc(s) {
 }
 
 function loadPlugins() {
+    var c = document.getElementById('pluginList');
+    // 骨架屏占位（参考 Primer skeleton loaders）：避免空白闪烁，感知更快
+    if (c) c.innerHTML = '<div class="skeleton-list" aria-busy="true" aria-live="polite">' +
+        '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>' +
+        '</div>';
     fetch('/api/plugins')
         .then(function(r) { return r.json(); })
         .then(function(d) { allPlugins = Array.isArray(d) ? d : []; renderPlugins(); })
         .catch(function() {
             allPlugins = [];
-            var c = document.getElementById('pluginList');
-            if (c) c.innerHTML = '<div class="empty-state"><div class="icon" aria-hidden="true">⚠️</div>加载插件失败，请检查网络后刷新</div>';
+            // 参考 GitHub Primer Blankslate error：图标+说明+重试按钮
+            if (c && window.renderErrorState) renderErrorState(c, '加载插件失败', loadPlugins);
+            else if (c) c.innerHTML = '<div class="empty-state"><div class="icon" aria-hidden="true">⚠️</div>加载插件失败</div>';
         });
 }
 

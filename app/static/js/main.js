@@ -1,8 +1,11 @@
 // ─── Toast 通知系统（升级版：进度条 / 点击关闭 / 堆叠上限 / 分类型时长） ───
 var _TOAST_MAX = 5;            // 最多同时显示 5 条
 var _TOAST_DURATIONS = { success: 3000, info: 3500, error: 6000, warning: 5000 };
-function showToast(msg, type) {
+// showToast(msg, type, opts) —— 兼容旧调用 showToast(msg, type)
+// opts.action: { label: '重试', fn: function(){...} } 参考 figr.design toast retry button
+function showToast(msg, type, opts) {
     type = type || 'info';
+    opts = opts || {};
     var container = document.getElementById('toastContainer');
     if (!container) return;
     // 堆叠上限：超出移除最早的一条
@@ -10,13 +13,33 @@ function showToast(msg, type) {
         container.removeChild(container.firstChild);
     }
     var dur = _TOAST_DURATIONS[type] || 3500;
+    // 带 action 的 toast 持续更久，给用户点击时间
+    if (opts.action) dur = Math.max(dur, 8000);
     var t = document.createElement('div');
     t.className = 'toast ' + type;
     t.setAttribute('role', 'status');
-    t.innerHTML = '<span class="toast-msg">' + _escHtml(msg) + '</span><button class="toast-close" aria-label="关闭">×</button><span class="toast-bar"></span>';
-    // 点击/触摸关闭
-    t.addEventListener('click', function() { removeToast(t); });
+    var html = '<span class="toast-msg">' + _escHtml(msg) + '</span>';
+    // 可选 action 按钮（如重试），参考 figr.design toast retry button
+    if (opts.action && opts.action.label) {
+        html += '<button class="toast-action" type="button">' + _escHtml(opts.action.label) + '</button>';
+    }
+    html += '<button class="toast-close" aria-label="关闭">×</button><span class="toast-bar"></span>';
+    t.innerHTML = html;
+    // 点击/触摸关闭（但点击 action 按钮不关闭，由 action 自己处理）
+    t.addEventListener('click', function(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('toast-action')) return;
+        removeToast(t);
+    });
     container.appendChild(t);
+    // 绑定 action 按钮
+    if (opts.action && opts.action.fn) {
+        var actionBtn = t.querySelector('.toast-action');
+        if (actionBtn) actionBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            try { opts.action.fn(); } catch(_) {}
+            removeToast(t);
+        });
+    }
     // 进度条动画
     var bar = t.querySelector('.toast-bar');
     if (bar) {
@@ -90,6 +113,38 @@ window.tdLock = function(btn, fn) {
     }
     return p;
 };
+
+// ─── 通用：列表错误状态渲染（参考 GitHub Primer Blankslate error 变体 + figr.design Full-Page Error） ──
+// 三要素：图标 + 说明 + 重试按钮。所有列表 catch 统一调用，避免散落实现不一致。
+// 用法：renderErrorState(containerEl, '加载插件失败', loadPlugins)
+window.renderErrorState = function(container, message, retryFn, opts) {
+    if (!container) return;
+    opts = opts || {};
+    var icon = opts.icon || '⚠️';
+    var retryText = opts.retryText || '重试';
+    var hint = opts.hint || '请检查网络后重试';
+    var esc = window._escHtml || function(s){ return String(s==null?'':s); };
+    var html = '<div class="empty-state empty-state-error" role="alert">' +
+        '<div class="icon" aria-hidden="true">' + esc(icon) + '</div>' +
+        '<div class="empty-title">' + esc(message) + '</div>' +
+        '<p class="empty-hint">' + esc(hint) + '</p>';
+    if (typeof retryFn === 'function') {
+        var btnId = 'td_retry_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+        html += '<button class="btn btn-outline btn-sm" id="' + btnId + '">' + esc(retryText) + '</button>';
+        // 延迟绑定 onclick，避免闭包引用过期 container
+        setTimeout(function() {
+            var b = document.getElementById(btnId);
+            if (b) b.addEventListener('click', function() {
+                // 重试时显示 loading 占位
+                container.innerHTML = '<div class="empty-state" aria-busy="true" aria-live="polite"><span class="spinner"></span> 加载中...</div>';
+                try { retryFn(); } catch(e) { /* 让 retryFn 内部 catch 处理 */ }
+            });
+        }, 0);
+    }
+    html += '</div>';
+    container.innerHTML = html;
+};
+
 
 // ─── ToolDelta 启停 ───
 function toggleTool() {
@@ -298,19 +353,21 @@ document.addEventListener('click', function(e) {
     if (target) target.classList.add('active');
 });
 
-// ─── 通用：按钮禁用防双击 + 自动恢复 ───
+// ─── 通用：按钮禁用防双击 + 自动恢复（参考 calmops button loading state） ───
+// loading 状态：按钮内嵌 spinner + 灰度，保留原文本避免布局抖动
 function withGuard(btn, fn) {
     if (!btn) return fn();
     if (btn.disabled) return;
     var orig = btn.textContent;
     btn.disabled = true;
-    btn.textContent = '处理中...';
+    btn.classList.add('btn-loading');
+    btn.textContent = orig; // 保留原文本，spinner 由 CSS::before 注入
     var p = fn();
     if (p && p.then) {
-        p.then(function() { btn.disabled = false; btn.textContent = orig; })
-         .catch(function() { btn.disabled = false; btn.textContent = orig; });
+        p.then(function() { btn.disabled = false; btn.classList.remove('btn-loading'); btn.textContent = orig; })
+         .catch(function() { btn.disabled = false; btn.classList.remove('btn-loading'); btn.textContent = orig; });
     } else {
-        btn.disabled = false; btn.textContent = orig;
+        btn.disabled = false; btn.classList.remove('btn-loading'); btn.textContent = orig;
     }
     return p;
 }
@@ -344,16 +401,27 @@ window.TDPoll = (function(){
         }
     });
     // 网络离线/恢复事件：暂停/恢复轮询并提示用户
+    function _updateOfflineBanner(offline) {
+        var b = document.getElementById('offlineBanner');
+        if (b) {
+            if (offline) { b.removeAttribute('hidden'); b.classList.add('visible'); }
+            else { b.classList.remove('visible'); setTimeout(function(){ b.setAttribute('hidden',''); }, 300); }
+        }
+    }
     window.addEventListener('online', function() {
         _offline = false;
         registry.forEach(function(reg){ start(reg); reg.fn(); });
+        _updateOfflineBanner(false);
         if (typeof showToast === 'function') showToast('网络已恢复', 'success');
     });
     window.addEventListener('offline', function() {
         _offline = true;
         registry.forEach(stop);
+        _updateOfflineBanner(true);
         if (typeof showToast === 'function') showToast('网络已断开，部分功能不可用', 'warning');
     });
+    // 初始离线状态：页面加载时若已离线则显示横幅
+    if (_offline) _updateOfflineBanner(true);
     return {
         register: function(fn, interval) {
             var reg = { fn: fn, interval: interval, timer: null };

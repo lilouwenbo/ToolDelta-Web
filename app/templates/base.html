@@ -199,6 +199,10 @@
     </aside>
 
     <main class="main-content" id="mainContent" aria-label="主要内容">
+        <!-- 离线横幅：参考 koder.ai offline state —— 持续提示直到恢复连接 -->
+        <div id="offlineBanner" class="offline-banner" role="status" aria-live="polite" hidden>
+          <span aria-hidden="true">📡</span> 当前处于离线状态，部分功能不可用
+        </div>
         {% block content %}{% endblock %}
     </main>
 
