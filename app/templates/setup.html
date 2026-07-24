@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>首次初始化 - ToolDelta Web</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body.auth-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; position: relative; }
+    </style>
+</head>
+<body class="auth-page">
+    <script>(function(){ if (localStorage.getItem('td_theme') === 'light') document.body.classList.add('theme-light'); })();</script>
+    <script src="/static/js/wallpaper.js"></script>
+
+    <div class="onb-overlay">
+        <div class="onb-card">
+            <div class="onb-steps">
+                <div class="onb-step active" data-step="1"><span class="dot">1</span><span class="lbl">欢迎</span></div>
+                <div class="onb-step" data-step="2"><span class="dot">2</span><span class="lbl">管理员</span></div>
+                <div class="onb-step" data-step="3"><span class="dot">3</span><span class="lbl">连接</span></div>
+                <div class="onb-step" data-step="4"><span class="dot">4</span><span class="lbl">外观</span></div>
+                <div class="onb-step" data-step="5"><span class="dot">5</span><span class="lbl">完成</span></div>
+            </div>
+            <div class="onb-progress"><div class="bar" id="onbBar"></div></div>
+            <div class="onb-panel" id="onbPanel"></div>
+            <div class="onb-actions" id="onbActions"></div>
+        </div>
+    </div>
+
+    <script>
+        var STEP = 1, TOTAL = 5;
+        var data = { username: '', password: '', host: '', port: '' };
+
+        function esc(s) {
+            return (s || '').replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
+        function setStep(n) {
+            STEP = n;
+            document.querySelectorAll('.onb-step').forEach(function (el) {
+                var s = +el.getAttribute('data-step');
+                el.classList.toggle('active', s === n);
+                el.classList.toggle('done', s < n);
+            });
+            document.getElementById('onbBar').style.width = (n / TOTAL * 100) + '%';
+            render();
+        }
+
+        function showErr(msg) {
+            var panel = document.getElementById('onbPanel');
+            var el = document.getElementById('onbErr');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'onbErr';
+                el.style.cssText = 'color:#f87171;font-size:13px;text-align:center;margin-top:14px';
+                panel.appendChild(el);
+            }
+            el.textContent = msg;
+        }
+
+        function render() {
+            var panel = document.getElementById('onbPanel');
+            var actions = document.getElementById('onbActions');
+            if (STEP === 1) {
+                panel.innerHTML = '<span class="onb-logo">TD</span>' +
+                    '<h2 style="text-align:center">欢迎使用 ToolDelta Web</h2>' +
+                    '<p class="sub" style="text-align:center">这是首次初始化，我们将用几步引导你完成基础配置。<br>整个过程只需一分钟，所有设置之后都可在面板中修改。</p>';
+                actions.innerHTML = '<span></span><button class="btn btn-primary" onclick="setStep(2)">开始配置 →</button>';
+            } else if (STEP === 2) {
+                panel.innerHTML = '<h2>管理员账号</h2>' +
+                    '<p class="sub">设置用于登录管理面板的账号与密码（首次初始化必需）。</p>' +
+                    '<div class="form-group"><label>用户名</label><input type="text" id="username" placeholder="设置用户名" value="' + esc(data.username) + '"></div>' +
+                    '<div class="form-group"><label>密码</label><input type="password" id="password" placeholder="设置密码（1-64 位）" value="' + esc(data.password) + '"></div>' +
+                    '<div class="form-group"><label>确认密码</label><input type="password" id="password2" placeholder="再次输入密码"></div>';
+                actions.innerHTML = '<button class="btn btn-outline" onclick="setStep(1)">← 上一步</button><button class="btn btn-primary" onclick="nextAdmin()">下一步 →</button>';
+            } else if (STEP === 3) {
+                panel.innerHTML = '<h2>服务器连接（可选）</h2>' +
+                    '<p class="sub">填写你的 Minecraft 服务器地址，初始化后即可一键连接；也可稍后在「服务器连接」中配置。</p>' +
+                    '<div class="form-group"><label>服务器地址</label><input type="text" id="host" placeholder="例如 127.0.0.1 或 play.example.com" value="' + esc(data.host) + '"></div>' +
+                    '<div class="form-group"><label>端口</label><input type="number" id="port" placeholder="例如 19132" value="' + esc(data.port) + '"></div>';
+                actions.innerHTML = '<button class="btn btn-outline" onclick="setStep(2)">← 上一步</button><button class="btn btn-outline" onclick="nextConn(true)">跳过</button><button class="btn btn-primary" onclick="nextConn(false)">下一步 →</button>';
+            } else if (STEP === 4) {
+                panel.innerHTML = '<h2>外观偏好</h2>' +
+                    '<p class="sub">选择深色 / 浅色主题，并预览随机背景壁纸。</p>' +
+                    '<div style="display:flex;gap:10px;margin-bottom:6px;flex-wrap:wrap">' +
+                    '<button class="btn btn-outline" onclick="setTheme(\'dark\')">🌑 深色</button>' +
+                    '<button class="btn btn-outline" onclick="setTheme(\'light\')">☀️ 浅色</button>' +
+                    '<button class="btn btn-outline" onclick="if(window.TDWallpaper)TDWallpaper.next()">🎲 换一张壁纸</button></div>';
+                actions.innerHTML = '<button class="btn btn-outline" onclick="setStep(3)">← 上一步</button><button class="btn btn-primary" onclick="setStep(5)">下一步 →</button>';
+            } else if (STEP === 5) {
+                panel.innerHTML = '<span class="onb-logo">✓</span>' +
+                    '<h2 style="text-align:center">准备就绪</h2>' +
+                    '<p class="sub" style="text-align:center">点击「完成初始化」创建管理员账号并进入面板。<br>所有设置之后都可在对应页面修改。</p>';
+                actions.innerHTML = '<button class="btn btn-outline" onclick="setStep(4)">← 上一步</button><button class="btn btn-primary" id="finishBtn" onclick="doFinish()">完成初始化</button>';
+            }
+        }
+
+        function nextAdmin() {
+            data.username = (document.getElementById('username').value || '').trim();
+            data.password = document.getElementById('password').value || '';
+            var p2 = document.getElementById('password2').value || '';
+            if (!data.username || !data.password) return showErr('请输入用户名和密码');
+            if (data.password.length < 1 || data.password.length > 64) return showErr('密码长度需为 1-64 位');
+            if (data.password !== p2) return showErr('两次密码不一致');
+            setStep(3);
+        }
+
+        function nextConn(skip) {
+            if (!skip) {
+                data.host = (document.getElementById('host').value || '').trim();
+                data.port = (document.getElementById('port').value || '').trim();
+            }
+            setStep(4);
+        }
+
+        function setTheme(t) {
+            var light = (t === 'light');
+            document.body.classList.toggle('theme-light', light);
+            localStorage.setItem('td_theme', light ? 'light' : 'dark');
+        }
+
+        function doFinish() {
+            if (!data.username || !data.password) { setStep(2); return showErr('请先设置管理员账号'); }
+            var btn = document.getElementById('finishBtn');
+            if (btn) { btn.disabled = true; btn.textContent = '初始化中...'; }
+            fetch('/api/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: data.username, password: data.password }) })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.success) { window.location.href = '/'; }
+                    else { if (btn) { btn.disabled = false; btn.textContent = '完成初始化'; } showErr(d.error || '初始化失败'); }
+                })
+                .catch(function () { if (btn) { btn.disabled = false; btn.textContent = '完成初始化'; } showErr('请求失败'); });
+        }
+
+        setStep(1);
+    </script>
+</body>
+</html>

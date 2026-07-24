@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% set active_page = "logs" %}
+{% block content %}
+<div class="page-header">
+    <h1>日志</h1>
+    <div>
+        <button class="btn btn-outline" onclick="refreshLogs()">刷新</button>
+        <button class="btn btn-outline" onclick="clearDisplay()">清屏</button>
+    </div>
+</div>
+
+<div class="search-bar">
+    <select id="logLevel">
+        <option value="">全部级别</option>
+        <option value="INFO">INFO</option>
+        <option value="WARN">WARN</option>
+        <option value="ERROR">ERROR</option>
+    </select>
+    <select id="logSource"><option value="">全部来源</option></select>
+    <input type="text" id="logFilter" placeholder="关键字过滤..." oninput="filterLogs()">
+    <select id="logDate" onchange="loadLogs()">
+        <option value="today">今天</option>
+    </select>
+    <button class="btn btn-primary" onclick="loadLogs()">搜索</button>
+    <button class="btn btn-outline" onclick="refreshLogs()">刷新</button>
+    <button class="btn btn-outline" onclick="doExport()">导出</button>
+</div>
+
+<div class="console-wrap">
+    <div class="console-header">
+        <span id="logStatus">日志</span>
+        <span id="logCount">0 行</span>
+    </div>
+    <div class="console-body" id="logBody" style="height:600px"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/logs.js"></script>
+{% endblock %}

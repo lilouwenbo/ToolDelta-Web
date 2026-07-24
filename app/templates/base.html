@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToolDelta Web 管理面板</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <script>
+      (function(){ if (localStorage.getItem('td_theme') === 'light') document.body.classList.add('theme-light'); })();
+      function toggleTheme(){ var light = document.body.classList.toggle('theme-light'); localStorage.setItem('td_theme', light ? 'light' : 'dark'); }
+    </script>
+    {% if wallpaper_url %}<div class="wallpaper-bg" style="background-image:url('{{ wallpaper_url }}')"></div>{% endif %}
+    <script src="/static/js/wallpaper.js"></script>
+    <aside class="sidebar" id="sidebar"{% if wallpaper_url %} style="background:rgba(15,16,17,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-right-color:rgba(255,255,255,0.06)"{% endif %}>
+        <div class="brand">
+            <span class="logo">TD</span>
+            <span class="brand-name">ToolDelta</span>
+            <span class="status-dot" id="sidebarStatus"></span>
+        </div>
+        <nav>
+            <a href="/" class="{% if active_page == 'index' %}active{% endif %}"><span class="nav-ico">📊</span>仪表盘</a>
+            <a href="/console" class="{% if active_page == 'console' %}active{% endif %}"><span class="nav-ico">🖥️</span>控制台</a>
+            <a href="/plugins" class="{% if active_page == 'plugins' %}active{% endif %}"><span class="nav-ico">🧩</span>插件管理</a>
+            <a href="/market" class="{% if active_page == 'market' %}active{% endif %}"><span class="nav-ico">🛒</span>插件市场</a>
+            <a href="/files" class="{% if active_page == 'files' %}active{% endif %}"><span class="nav-ico">📁</span>文件管理</a>
+            <a href="/commands" class="{% if active_page == 'commands' %}active{% endif %}"><span class="nav-ico">⌨️</span>命令参考</a>
+            <a href="/backup" class="{% if active_page == 'backup' %}active{% endif %}"><span class="nav-ico">💾</span>备份恢复</a>
+            <a href="/logs" class="{% if active_page == 'logs' %}active{% endif %}"><span class="nav-ico">📜</span>日志</a>
+            <a href="/connections" class="{% if active_page == 'connections' %}active{% endif %}"><span class="nav-ico">🌐</span>服务器连接</a>
+            <a href="/watchdog" class="{% if active_page == 'watchdog' %}active{% endif %}"><span class="nav-ico">🐕</span>看门狗</a>
+            <a href="/scheduler" class="{% if active_page == 'scheduler' %}active{% endif %}"><span class="nav-ico">⏰</span>定时任务</a>
+            <a href="/settings" class="{% if active_page == 'settings' %}active{% endif %}" style="margin-top:8px;border-top:1px solid var(--hairline);padding-top:12px"><span class="nav-ico">🎛️</span>面板设置</a>
+        </nav>
+        <div class="sidebar-footer">
+            <button class="theme-toggle" onclick="toggleTheme()" title="切换深色 / 浅色主题">🌗 主题</button>
+            <div class="user-box">
+                <span class="user-name">{{ session.get('username','?') }}</span>
+                <a href="/logout" class="logout-link">退出</a>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- 依赖安装遮罩层：高斯模糊背景 + 安装方式选择 + 动画进度条 + 实时日志 -->
+    <div class="dep-overlay" id="depOverlay">
+        <div class="dep-card">
+            <!-- 步骤一：选择安装方式 -->
+            <div class="dep-choose" id="depChoose">
+                <div class="dep-head">
+                    <div class="dep-orb"></div>
+                    <div>
+                        <h2>安装运行依赖</h2>
+                        <p class="dep-stage">首次运行需安装 ToolDelta 依赖，请选择安装方式。</p>
+                    </div>
+                </div>
+                <div class="dep-options">
+                    <button class="dep-opt" onclick="triggerDepInstall('local')">
+                        <div class="dep-opt-ico">📦</div>
+                        <div class="dep-opt-main">
+                            <div class="dep-opt-title">本地安装<span class="dep-opt-sub">（离线）</span></div>
+                            <div class="dep-opt-desc">使用随附离线包，无需联网，适合共享服务器 / 无外网环境。</div>
+                        </div>
+                        <span class="dep-opt-tag">可能版本较旧</span>
+                    </button>
+                    <button class="dep-opt" onclick="triggerDepInstall('online')">
+                        <div class="dep-opt-ico">🌐</div>
+                        <div class="dep-opt-main">
+                            <div class="dep-opt-title">网络安装<span class="dep-opt-sub">（在线）</span></div>
+                            <div class="dep-opt-desc">从 PyPI / 镜像源下载最新版本，需要联网。</div>
+                        </div>
+                        <span class="dep-opt-tag dep-opt-tag-new">最新版本</span>
+                    </button>
+                </div>
+            </div>
+            <!-- 步骤二：安装进度 -->
+            <div class="dep-run" id="depRun" style="display:none">
+                <div class="dep-head">
+                    <div class="dep-orb"></div>
+                    <div>
+                        <h2 id="depTitle">正在初始化运行环境</h2>
+                        <p class="dep-stage" id="depStage">准备中…</p>
+                    </div>
+                </div>
+                <div class="dep-progress"><div class="dep-bar" id="depBar"></div></div>
+                <div class="dep-meta">
+                    <span id="depPercent">0%</span>
+                    <span class="dep-dot">·</span>
+                    <span>镜像源：<span id="depMirror">测速中…</span></span>
+                </div>
+                <div class="dep-log" id="depLog"></div>
+                <div class="dep-actions" id="depActions" style="display:none">
+                    <button class="btn btn-outline" onclick="showDepChoose()">更换方式</button>
+                    <button class="btn btn-primary" onclick="triggerDepInstall()">重试安装</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal" style="max-width:420px">
+            <h2 id="confirmTitle">确认</h2>
+            <p id="confirmMessage" style="font-size:14px;color:var(--ink-muted);line-height:1.6;margin-bottom:8px"></p>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeConfirm(false)">取消</button>
+                <button class="btn btn-danger" id="confirmOkBtn" onclick="closeConfirm(true)">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/socket.io.min.js"></script>
+    <script src="/static/js/main.js"></script>
+    <script src="/static/js/deps.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

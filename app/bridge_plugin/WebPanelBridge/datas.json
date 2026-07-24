@@ -1,0 +1,9 @@
+{
+    "author": "WebPanel",
+    "version": "1.0.0",
+    "plugin-type": "classic",
+    "description": "Web 面板桥接插件 - 追踪命令注册来源",
+    "pre-plugins": {},
+    "plugin-id": "WebPanelBridge",
+    "enabled": true
+}

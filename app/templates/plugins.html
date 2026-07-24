@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+{% set active_page = "plugins" %}
+{% block content %}
+<div class="page-header">
+    <h1>插件管理</h1>
+    <button class="btn btn-primary" onclick="showAddPluginModal()">添加插件</button>
+</div>
+
+<div class="search-bar">
+    <input type="text" id="pluginSearch" placeholder="搜索插件名..." oninput="renderPlugins()">
+    <select id="pluginFilter" onchange="renderPlugins()">
+        <option value="all">全部</option>
+        <option value="enabled">已启用</option>
+        <option value="disabled">已禁用</option>
+    </select>
+</div>
+
+<div id="pluginList" class="plugin-grid"></div>
+
+<!-- Add Plugin Modal -->
+<div class="modal-overlay" id="addPluginModal">
+    <div class="modal">
+        <h2>添加插件</h2>
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="uploadTab">上传插件</button>
+            <button class="tab-btn" data-tab="presetTab">预设插件</button>
+            <button class="tab-btn" data-tab="networkTab">网络安装</button>
+        </div>
+
+        <div class="tab-content active" id="uploadTab">
+            <div class="form-group">
+                <label>上传插件压缩包 (.zip)</label>
+                <input type="file" id="pluginZip" accept=".zip">
+            </div>
+            <button class="btn btn-primary" onclick="uploadPlugin()">上传并安装</button>
+            <div id="uploadProgress" style="margin-top:8px;font-size:12px;color:var(--text-secondary)"></div>
+        </div>
+
+        <div class="tab-content" id="presetTab">
+            <div class="form-group">
+                <input type="text" id="presetSearch" placeholder="搜索预设插件..." oninput="renderPresets()">
+            </div>
+            <div id="presetList" class="check-list" style="margin-bottom:8px"></div>
+            <div style="display:flex;gap:8px;align-items:center">
+                <label style="font-size:13px"><input type="checkbox" id="selectAllPresets" onchange="toggleAllPresets()"> 全选</label>
+                <button class="btn btn-success btn-sm" onclick="installPresets()">批量安装</button>
+            </div>
+        </div>
+
+        <div class="tab-content" id="networkTab">
+            <div class="form-group">
+                <label>插件市场源</label>
+                <select id="marketUrl" onchange="onMarketSourceChange()">
+                    <option value="">— 请选择市场源 —</option>
+                </select>
+            </div>
+            <div class="form-group" id="customMarketUrlGroup" style="display:none">
+                <label>自定义市场源 URL</label>
+                <input type="text" id="customMarketUrl" placeholder="https://pm.tooldelta.top">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="connectMarket()">连接并获取列表</button>
+            <div id="networkPluginList" style="margin-top:12px"></div>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeModal('addPluginModal')">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- Plugin Detail Modal -->
+<div class="modal-overlay" id="pluginDetailModal">
+    <div class="modal">
+        <h2 id="detailName"></h2>
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="detailInfoTab">信息</button>
+            <button class="tab-btn" data-tab="detailConfigTab">配置</button>
+            <button class="tab-btn" data-tab="detailDataTab">数据</button>
+            <button class="tab-btn" data-tab="detailReadmeTab">文档</button>
+        </div>
+        <div class="tab-content active" id="detailInfoTab"></div>
+        <div class="tab-content" id="detailConfigTab">
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+                <input type="file" id="configUploadInput" style="flex:1">
+                <button class="btn btn-sm btn-primary" onclick="uploadConfigFile()">上传</button>
+            </div>
+            <pre id="detailConfig" style="font-size:12px;white-space:pre-wrap;max-height:300px;overflow:auto"></pre>
+        </div>
+        <div class="tab-content" id="detailDataTab">
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+                <input type="file" id="dataUploadInput" style="flex:1">
+                <button class="btn btn-sm btn-primary" onclick="uploadDataFile()">上传</button>
+            </div>
+            <div id="detailDataList"></div>
+        </div>
+        <div class="tab-content" id="detailReadmeTab"><div id="detailReadme" style="font-size:13px;max-height:300px;overflow:auto"></div></div>
+        <div class="modal-actions">
+            <button class="btn btn-outline" onclick="closeModal('pluginDetailModal')">关闭</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var allPlugins = [];
+var allPresets = [];
+
+function loadPlugins() {
+    fetch('/api/plugins')
+        .then(function(r) { return r.json(); })
+        .then(function(d) { allPlugins = d; renderPlugins(); });
+}
+
+// 加载预设插件市场源
+function loadMarketSources() {
+    fetch('/api/market/sources')
+        .then(function(r) { return r.json(); })
+        .then(function(sources) {
+            var sel = document.getElementById('marketUrl');
+            sources.forEach(function(s) {
+                var opt = document.createElement('option');
+                opt.value = s.url;
+                opt.textContent = s.name;
+                sel.appendChild(opt);
+            });
+            // 添加"自定义"选项
+            var cust = document.createElement('option');
+            cust.value = '__custom__';
+            cust.textContent = '✏️ 自定义...';
+            sel.appendChild(cust);
+        });
+}
+function onMarketSourceChange() {
+    var sel = document.getElementById('marketUrl');
+    var grp = document.getElementById('customMarketUrlGroup');
+    grp.style.display = sel.value === '__custom__' ? 'block' : 'none';
+    if (sel.value !== '__custom__' && sel.value) {
+        document.getElementById('networkPluginList').innerHTML = '';
+    }
+}
+
+loadMarketSources();
+
+function renderPlugins() {
+    var q = document.getElementById('pluginSearch').value.toLowerCase();
+    var filter = document.getElementById('pluginFilter').value;
+    var list = allPlugins.filter(function(p) {
+        if (filter === 'enabled' && !p.is_enabled) return false;
+        if (filter === 'disabled' && p.is_enabled) return false;
+        return p.name.toLowerCase().indexOf(q) !== -1;
+    });
+    var container = document.getElementById('pluginList');
+    if (list.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">---</div>暂无插件</div>';
+        return;
+    }
+    container.innerHTML = list.map(function(p) {
+        return '<div class="plugin-card">' +
+            '<div class="p-name">' + p.name + ' <span class="tag ' + (p.is_enabled ? 'tag-enabled' : 'tag-disabled') + '">' + (p.is_enabled ? '已启用' : '已禁用') + '</span></div>' +
+            '<div class="p-meta">v' + p.version + ' | ' + p.author + ' | <span class="tag tag-classic">' + p.plugin_type + '</span></div>' +
+            '<div class="p-desc">' + (p.description || '暂无描述') + '</div>' +
+            '<div class="p-actions">' +
+            '<button class="btn btn-sm ' + (p.is_enabled ? 'btn-warning' : 'btn-success') + '" onclick="togglePlugin(\'' + p.name + '\',' + (p.is_enabled ? 'false' : 'true') + ')">' + (p.is_enabled ? '禁用' : '启用') + '</button>' +
+            '<button class="btn btn-sm btn-danger" onclick="deletePlugin(\'' + p.name + '\')">删除</button>' +
+            '<button class="btn btn-sm btn-outline" onclick="showPluginDetail(\'' + p.name + '\')">详情</button>' +
+            '</div></div>';
+    }).join('');
+}
+
+function togglePlugin(name, enable) {
+    fetch('/api/plugins/toggle', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name, enable:enable}) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) { showToast(enable ? '已启用' : '已禁用', 'success'); loadPlugins(); }
+            else showToast('操作失败', 'error');
+        });
+}
+
+function deletePlugin(name) {
+    showConfirm('确定删除插件 ' + name + '？此操作不可撤销。', function(ok) {
+        if (!ok) return;
+        fetch('/api/plugins/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name}) })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success) { showToast('已删除', 'success'); loadPlugins(); }
+                else showToast('删除失败', 'error');
+            });
+    });
+}
+
+function showAddPluginModal() {
+    document.getElementById('addPluginModal').classList.add('active');
+    loadPresets();
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+}
+
+function uploadPlugin() {
+    var fileInput = document.getElementById('pluginZip');
+    if (!fileInput.files[0]) { showToast('请选择 .zip 文件', 'error'); return; }
+    var form = new FormData();
+    form.append('file', fileInput.files[0]);
+    document.getElementById('uploadProgress').textContent = '上传中...';
+    fetch('/api/plugins/upload', { method:'POST', body:form })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            document.getElementById('uploadProgress').textContent = d.success ? '安装成功' : '失败: ' + (d.error || '未知错误');
+            if (d.success) { loadPlugins(); setTimeout(function() { closeModal('addPluginModal'); }, 1000); }
+        });
+}
+
+function loadPresets() {
+    fetch('/api/plugins/presets')
+        .then(function(r) { return r.json(); })
+        .then(function(d) { allPresets = d; renderPresets(); });
+}
+
+function renderPresets() {
+    var q = document.getElementById('presetSearch').value.toLowerCase();
+    var list = allPresets.filter(function(p) { return p.name.toLowerCase().indexOf(q) !== -1 || p.id.toLowerCase().indexOf(q) !== -1; });
+    document.getElementById('presetList').innerHTML = list.map(function(p) {
+        return '<label><input type="checkbox" class="preset-cb" value="' + p.id + '"> ' + p.name + ' <span style="color:var(--text-secondary)">v' + p.version + ' | ' + p.author + '</span></label>';
+    }).join('');
+}
+
+function toggleAllPresets() {
+    var checked = document.getElementById('selectAllPresets').checked;
+    document.querySelectorAll('.preset-cb').forEach(function(cb) { cb.checked = checked; });
+}
+
+function installPresets() {
+    var ids = [];
+    document.querySelectorAll('.preset-cb:checked').forEach(function(cb) { ids.push(cb.value); });
+    if (!ids.length) { showToast('请选择至少一个插件', 'error'); return; }
+    fetch('/api/plugins/install-preset-batch', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({plugin_ids: ids}) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            var ok = d.results.filter(function(r) { return r.success; }).length;
+            showToast('安装完成: ' + ok + '/' + ids.length + ' 成功', ok === ids.length ? 'success' : 'info');
+            loadPlugins();
+        });
+}
+
+function connectMarket() {
+    var sel = document.getElementById('marketUrl');
+    var url = sel.value === '__custom__' ? document.getElementById('customMarketUrl').value.trim() : sel.value.trim();
+    if (!url) { showToast('请选择或输入插件市场源', 'error'); return; }
+    fetch('/api/market/connect', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url: url}) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            var container = document.getElementById('networkPluginList');
+            if (!d.success) { container.innerHTML = '<div style="color:var(--danger)">连接失败: ' + d.error + '</div>'; return; }
+            container.innerHTML = '<div style="font-size:13px;margin-bottom:8px">' + d.source_name + ' - ' + d.plugins.length + ' 个插件</div>' +
+                '<div class="check-list">' + d.plugins.map(function(p) {
+                    return '<label><input type="checkbox" class="net-cb" value="' + p.id + '" data-url="' + url + '"> ' + p.name + ' <span style="color:var(--text-secondary)">v' + p.version + ' | ' + p.author + '</span></label>';
+                }).join('') + '</div>' +
+                '<button class="btn btn-success btn-sm" style="margin-top:8px" onclick="installNetwork()">安装选中插件</button>';
+        });
+}
+
+function installNetwork() {
+    var cbs = document.querySelectorAll('.net-cb:checked');
+    if (!cbs.length) { showToast('请选择至少一个插件', 'error'); return; }
+    var ok = 0, total = cbs.length;
+    cbs.forEach(function(cb) {
+        var url = cb.getAttribute('data-url');
+        var id = cb.value;
+        fetch('/api/plugins/install-network', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url: url, plugin_id: id}) })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success) ok++;
+                if (ok + (total - [...cbs].indexOf(cb) - 1) === total) {
+                    showToast('安装完成: ' + ok + '/' + total + ' 成功', 'success');
+                    loadPlugins();
+                }
+            });
+    });
+}
+
+function showPluginDetail(name) {
+    var p = allPlugins.find(function(x) { return x.name === name; });
+    if (!p) return;
+    document.getElementById('detailName').textContent = p.name;
+    document.getElementById('detailInfoTab').innerHTML =
+        '<table><tr><td style="width:100px">版本</td><td>v' + p.version + '</td></tr>' +
+        '<tr><td>作者</td><td>' + p.author + '</td></tr>' +
+        '<tr><td>类型</td><td>' + p.plugin_type + '</td></tr>' +
+        '<tr><td>状态</td><td>' + (p.is_enabled ? '已启用' : '已禁用') + '</td></tr>' +
+        '<tr><td>描述</td><td>' + (p.description || '无') + '</td></tr></table>';
+    document.getElementById('detailConfig').textContent = '加载中...';
+    document.getElementById('detailDataList').innerHTML = '<div class="spinner"></div>';
+    document.getElementById('detailReadme').innerHTML = '<div class="spinner"></div>';
+    document.getElementById('pluginDetailModal').classList.add('active');
+
+    fetch('/api/plugins/config?name=' + name)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            var el = document.getElementById('detailConfig');
+            if (el) el.textContent = d.error ? '无配置文件' : JSON.stringify(d, null, 2);
+        });
+
+    fetch('/api/plugins/data-files?name=' + name)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            renderDataFiles(d, name);
+        });
+
+    fetch('/api/plugins/readme?name=' + name)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.error) document.getElementById('detailReadme').innerHTML = '<div style="font-size:13px;color:var(--text-secondary)">无文档</div>';
+            else document.getElementById('detailReadme').innerHTML = '<pre style="font-size:12px;white-space:pre-wrap">' + d.content + '</pre>';
+        });
+}
+
+var currentDetailName = null;
+
+function renderDataFiles(files, name) {
+    currentDetailName = name;
+    var html = '';
+    if (files.length === 0) {
+        html = '<div style="font-size:13px;color:var(--ink-subtle);margin-bottom:8px">无数据文件</div>';
+    } else {
+        html = files.map(function(f) {
+            var safe = f.replace(/'/g, "\\'");
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px;border-bottom:1px solid var(--hairline)">' +
+                '<span>' + f + '</span>' +
+                '<button class="btn btn-sm btn-danger" onclick="deleteDataFile(\'' + name + "','" + safe + "')" + '">删除</button></div>';
+        }).join('');
+    }
+    document.getElementById('detailDataList').innerHTML = html;
+}
+
+function uploadDataFile() {
+    var input = document.getElementById('dataUploadInput');
+    if (!input || !input.files || !input.files[0]) { showToast('请选择文件', 'error'); return; }
+    var form = new FormData();
+    form.append('name', currentDetailName);
+    form.append('file', input.files[0]);
+    document.getElementById('dataUploadInput').disabled = true;
+    fetch('/api/plugins/data-upload', { method: 'POST', body: form })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) { showToast('上传成功', 'success'); refreshDataFiles(); }
+            else showToast('上传失败', 'error');
+            document.getElementById('dataUploadInput').disabled = false;
+        });
+}
+
+function uploadConfigFile() {
+    var input = document.getElementById('configUploadInput');
+    if (!input || !input.files || !input.files[0]) { showToast('请选择文件', 'error'); return; }
+    var form = new FormData();
+    form.append('name', currentDetailName);
+    form.append('file', input.files[0]);
+    document.getElementById('configUploadInput').disabled = true;
+    fetch('/api/plugins/config-upload', { method: 'POST', body: form })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) { showToast('上传成功', 'success'); refreshConfigFile(); }
+            else showToast('上传失败', 'error');
+            document.getElementById('configUploadInput').disabled = false;
+        });
+}
+
+function deleteDataFile(name, filename) {
+    showConfirm('确定删除文件 ' + filename + '？', function(ok) {
+        if (!ok) return;
+        fetch('/api/plugins/data-delete', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: name, file: filename}) })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success) { showToast('已删除', 'success'); refreshDataFiles(); }
+                else showToast('删除失败', 'error');
+            });
+    });
+}
+
+function refreshDataFiles() {
+    fetch('/api/plugins/data-files?name=' + currentDetailName)
+        .then(function(r) { return r.json(); })
+        .then(function(d) { renderDataFiles(d, currentDetailName); });
+}
+
+function refreshConfigFile() {
+    fetch('/api/plugins/config?name=' + currentDetailName)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            var el = document.getElementById('detailConfig');
+            if (el) el.textContent = d.error ? '无配置文件' : JSON.stringify(d, null, 2);
+        });
+}
+
+loadPlugins();
+</script>
+{% endblock %}

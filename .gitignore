@@ -1,0 +1,50 @@
+# ── Python ──────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.Python
+*.so
+
+# ── 虚拟环境 ────────────────────────────
+venv/
+.venv/
+env/
+
+# ── 运行时数据（由项目自动生成，不应提交）──
+backups/
+ToolDelta/
+plugin_market/
+bridge_plugin/__pycache__/
+instance/
+data/
+*.db
+*.sqlite3
+
+# ── 日志与本地临时文件 ──────────────────
+*.log
+cf_log*.txt
+tunnel_url.txt
+
+# ── 环境变量 / 密钥 ────────────────────
+.env
+*.local
+
+# ── 编辑器 / 系统 ──────────────────────
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# ── 打包产物 ───────────────────────────
+*.zip
+!tooldelta_source/ToolDelta-main.zip
+
+# ── 构建存档（每次构建生成，不提交）──
+archives/
+build_info.json
+
+# ── 自检结果产物（每次自检生成，不提交）──
+selfcheck_summary.txt

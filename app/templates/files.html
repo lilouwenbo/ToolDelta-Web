@@ -1,0 +1,430 @@
+{% extends "base.html" %}
+{% block content %}
+<div>
+    <div class="page-header">
+        <h1>文件管理</h1>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline" onclick="showNewFolder()">新建文件夹</button>
+            <button class="btn btn-outline" onclick="downloadDir()" id="downloadDirBtn" style="display:none">下载目录</button>
+            <button class="btn btn-outline" onclick="batchDelete()" id="batchDelBtn" style="display:none">删除选中</button>
+            <button class="btn btn-primary" onclick="document.getElementById('uploadInput').click()">上传文件</button>
+            <input type="file" id="uploadInput" style="display:none" multiple onchange="uploadFiles(this.files)">
+        </div>
+    </div>
+
+    <div class="card" style="padding:12px 16px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap">
+            <span style="color:var(--ink-muted)">位置:</span>
+            <a href="#" onclick="navigateTo('')" style="color:var(--primary);text-decoration:none">/</a>
+            <span id="breadcrumbs" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"></span>
+            <span style="margin-left:auto;color:var(--ink-subtle);font-size:12px" id="fileCount"></span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+            <input type="text" id="searchInput" placeholder="搜索文件..." style="flex:1;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:13px;outline:none" onkeydown="if(event.key==='Enter')doSearch()">
+            <button class="btn btn-sm btn-outline" onclick="doSearch()">搜索</button>
+            <button class="btn btn-sm btn-outline" onclick="clearSearch()" id="clearSearchBtn" style="display:none">清除</button>
+        </div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+        <table style="width:100%">
+            <thead>
+                <tr>
+                    <th style="padding:10px 14px;width:32px"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this.checked)"></th>
+                    <th style="padding:10px 14px;cursor:pointer" onclick="setSort('name')">名称 <span id="sortName" style="color:var(--ink-tertiary);font-size:11px"></span></th>
+                    <th style="padding:10px 14px;width:100px;cursor:pointer" onclick="setSort('size')">大小 <span id="sortSize" style="color:var(--ink-tertiary);font-size:11px"></span></th>
+                    <th style="padding:10px 14px;width:160px;cursor:pointer" onclick="setSort('mtime')">修改时间 <span id="sortMtime" style="color:var(--ink-tertiary);font-size:11px"></span></th>
+                    <th style="padding:10px 14px;width:180px">操作</th>
+                </tr>
+            </thead>
+            <tbody id="fileList"></tbody>
+        </table>
+        <div id="emptyState" class="empty-state" style="display:none">
+            <div class="icon" id="emptyIcon">📁</div>
+            <p id="emptyText">此目录为空</p>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="editorModal">
+    <div class="modal" style="max-width:800px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h2 style="font-size:16px;font-weight:600" id="editorTitle">编辑文件</h2>
+            <div style="display:flex;gap:6px">
+                <button class="btn btn-sm btn-primary" onclick="saveEditor()">保存</button>
+                <button class="btn btn-sm btn-outline" onclick="closeEditor()">取消</button>
+            </div>
+        </div>
+        <textarea id="editorContent" style="width:100%;height:60vh;padding:12px;border-radius:8px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-family:'Cascadia Code','Consolas',monospace;font-size:13px;resize:vertical;outline:none;box-sizing:border-box" spellcheck="false"></textarea>
+    </div>
+</div>
+
+<div class="modal-overlay" id="moveCopyModal">
+    <div class="modal" style="max-width:480px">
+        <h2 id="moveCopyTitle" style="font-size:16px;font-weight:600;margin-bottom:16px">移动/复制</h2>
+        <p style="font-size:13px;color:var(--ink-muted);margin-bottom:12px" id="moveCopyDesc"></p>
+        <input type="text" id="moveCopyPath" placeholder="输入目标路径..." style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:13px;outline:none;box-sizing:border-box">
+        <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+            <button class="btn btn-primary btn-sm" id="moveCopyConfirmBtn" onclick="confirmMoveCopy()">确认</button>
+            <button class="btn btn-outline btn-sm" onclick="closeMoveCopy()">取消</button>
+        </div>
+    </div>
+</div>
+
+<script>
+var CURRENT_PATH = '';
+var FILES_ROOT = '';
+var SELECTED = [];
+var SORT_BY = 'name';
+var SORT_DIR = 'asc';
+var IS_SEARCH = false;
+
+function navigateTo(path) {
+    CURRENT_PATH = path;
+    IS_SEARCH = false;
+    document.getElementById('clearSearchBtn').style.display = 'none';
+    document.getElementById('searchInput').value = '';
+    updateDownloadBtn();
+    loadFiles();
+}
+
+function loadFiles() {
+    var url = IS_SEARCH
+        ? '/api/files/search?q=' + encodeURIComponent(document.getElementById('searchInput').value) + '&path=' + encodeURIComponent(CURRENT_PATH)
+        : '/api/files/list?path=' + encodeURIComponent(CURRENT_PATH);
+    fetch(url).then(function(r){return r.json()}).then(function(d){
+        if (!d.success) { showToast(d.error||'加载失败', 'error'); return; }
+        FILES_ROOT = d.data.root;
+        renderBreadcrumbs(d.data.current);
+        renderFiles(sortEntries(d.data.entries));
+    }).catch(function(){ showToast('请求失败', 'error'); });
+}
+
+function sortEntries(entries) {
+    var dirs = entries.filter(function(e){ return e.is_dir; });
+    var files = entries.filter(function(e){ return !e.is_dir; });
+    var cmp = SORT_DIR === 'asc' ? 1 : -1;
+    dirs.sort(function(a,b){
+        var va = a[SORT_BY], vb = b[SORT_BY];
+        if (SORT_BY === 'name') return va.localeCompare(vb) * cmp;
+        return (va < vb ? -1 : va > vb ? 1 : 0) * cmp;
+    });
+    files.sort(function(a,b){
+        var va = a[SORT_BY], vb = b[SORT_BY];
+        if (SORT_BY === 'name') return va.localeCompare(vb) * cmp;
+        return (va < vb ? -1 : va > vb ? 1 : 0) * cmp;
+    });
+    return dirs.concat(files);
+}
+
+function setSort(field) {
+    if (SORT_BY === field) SORT_DIR = SORT_DIR === 'asc' ? 'desc' : 'asc';
+    else { SORT_BY = field; SORT_DIR = 'asc'; }
+    document.querySelectorAll('th span[id^="sort"]').forEach(function(s){ s.textContent = ''; });
+    document.getElementById('sort' + field.charAt(0).toUpperCase() + field.slice(1)).textContent = SORT_DIR === 'asc' ? '▲' : '▼';
+    loadFiles();
+}
+
+function renderBreadcrumbs(current) {
+    var el = document.getElementById('breadcrumbs');
+    el.innerHTML = '';
+    if (!current) return;
+    var parts = current.replace(/\\/g,'/').split('/');
+    parts.forEach(function(p, i) {
+        var sep = document.createElement('span');
+        sep.textContent = '/';
+        sep.style.color = 'var(--ink-tertiary)';
+        el.appendChild(sep);
+        var a = document.createElement('a');
+        a.textContent = p;
+        a.href = '#';
+        a.style.cssText = 'color:var(--primary);text-decoration:none';
+        a.onclick = (function(path){ return function(){ navigateTo(path); }; })(parts.slice(0, i+1).join('/'));
+        el.appendChild(a);
+    });
+}
+
+function renderFiles(entries) {
+    var tbody = document.getElementById('fileList');
+    var empty = document.getElementById('emptyState');
+    var emptyIcon = document.getElementById('emptyIcon');
+    var emptyText = document.getElementById('emptyText');
+    tbody.innerHTML = '';
+    SELECTED = [];
+    document.getElementById('selectAll').checked = false;
+    updateBatchBtn();
+    if (entries.length === 0) {
+        empty.style.display = 'block';
+        if (IS_SEARCH) { emptyIcon.textContent = '🔍'; emptyText.textContent = '未找到匹配的文件'; }
+        else { emptyIcon.textContent = '📁'; emptyText.textContent = '此目录为空'; }
+        document.getElementById('fileCount').textContent = '0 项';
+        return;
+    }
+    empty.style.display = 'none';
+    document.getElementById('fileCount').textContent = entries.length + ' 项';
+    entries.forEach(function(e) {
+        var tr = document.createElement('tr');
+        tr.style.cursor = e.is_dir ? 'pointer' : 'default';
+        var icon = e.is_dir ? '📁' : getFileIcon(e.ext);
+        var sizeStr = e.is_dir ? '-' : formatSize(e.size);
+        var timeStr = formatTime(e.mtime);
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.style.margin = '0';
+        cb.addEventListener('change', function() { toggleSelect(e.path, this.checked); });
+        tr.innerHTML = '<td style="padding:10px 14px;font-size:12px"></td><td style="padding:10px 14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:400px"><span style="margin-right:6px">'+icon+'</span>'+escapeHtml(e.name)+'</td><td style="padding:10px 14px;color:var(--ink-subtle);font-size:12px">'+sizeStr+'</td><td style="padding:10px 14px;color:var(--ink-subtle);font-size:12px">'+timeStr+'</td>';
+        tr.cells[0].appendChild(cb);
+        var td = document.createElement('td');
+        td.style.padding = '10px 14px';
+        td.style.whiteSpace = 'nowrap';
+        if (e.is_dir) {
+            tr.addEventListener('dblclick', function(){ navigateTo(e.path); });
+            var openBtn = document.createElement('button');
+            openBtn.className = 'btn btn-sm btn-outline';
+            openBtn.textContent = '打开';
+            openBtn.style.marginRight = '4px';
+            openBtn.onclick = function(){ navigateTo(e.path); };
+            td.appendChild(openBtn);
+        } else {
+            var editBtn = document.createElement('button');
+            editBtn.className = 'btn btn-sm btn-outline';
+            editBtn.textContent = '编辑';
+            editBtn.style.marginRight = '4px';
+            editBtn.onclick = function(){ openEditor(e.path); };
+            td.appendChild(editBtn);
+            var dlBtn = document.createElement('button');
+            dlBtn.className = 'btn btn-sm btn-outline';
+            dlBtn.textContent = '下载';
+            dlBtn.style.marginRight = '4px';
+            dlBtn.onclick = function(){ window.open('/api/files/download?path='+encodeURIComponent(e.path)); };
+            td.appendChild(dlBtn);
+        }
+        var rnBtn = document.createElement('button');
+        rnBtn.className = 'btn btn-sm btn-outline';
+        rnBtn.textContent = '重命名';
+        rnBtn.style.marginRight = '4px';
+        rnBtn.onclick = function(){ renameItem(e.path); };
+        td.appendChild(rnBtn);
+        var mcBtn = document.createElement('button');
+        mcBtn.className = 'btn btn-sm btn-outline';
+        mcBtn.textContent = '移动';
+        mcBtn.style.marginRight = '4px';
+        mcBtn.onclick = function(){ showMoveCopy(e.path, e.is_dir); };
+        td.appendChild(mcBtn);
+        var delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-sm btn-outline';
+        delBtn.textContent = '删除';
+        delBtn.onclick = (function(path, isDir){ return function(){ deleteItem(path, isDir); }; })(e.path, e.is_dir);
+        td.appendChild(delBtn);
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+    });
+    updateDownloadBtn();
+}
+
+function toggleSelect(path, checked) {
+    if (checked) { if (SELECTED.indexOf(path) < 0) SELECTED.push(path); }
+    else { SELECTED = SELECTED.filter(function(p){ return p !== path; }); }
+    updateBatchBtn();
+}
+
+function toggleSelectAll(checked) {
+    var cbs = document.querySelectorAll('#fileList input[type="checkbox"]');
+    SELECTED = [];
+    if (checked) {
+        cbs.forEach(function(cb){ cb.checked = true; });
+        document.querySelectorAll('#fileList tr').forEach(function(tr){
+            var path = tr._path;
+            if (path) SELECTED.push(path);
+        });
+    } else {
+        cbs.forEach(function(cb){ cb.checked = false; });
+    }
+    updateBatchBtn();
+}
+
+function updateBatchBtn() {
+    var btn = document.getElementById('batchDelBtn');
+    btn.style.display = SELECTED.length > 0 ? 'inline-flex' : 'none';
+}
+
+function updateDownloadBtn() {
+    var btn = document.getElementById('downloadDirBtn');
+    btn.style.display = (!IS_SEARCH && CURRENT_PATH !== '') ? 'inline-flex' : 'none';
+}
+
+function batchDelete() {
+    if (SELECTED.length === 0) return;
+    showConfirm('确定删除选中的 ' + SELECTED.length + ' 项吗？', function(ok) {
+        if (!ok) return;
+        fetch('/api/files/batch-delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({paths:SELECTED}) })
+        .then(function(r){return r.json()})
+        .then(function(d){
+            if (d.data && d.data.deleted && d.data.deleted.length > 0) showToast('已删除 ' + d.data.deleted.length + ' 项', 'success');
+            if (d.data && d.data.errors && d.data.errors.length > 0) showToast('失败: ' + d.data.errors[0], 'error');
+            loadFiles();
+        });
+    });
+}
+
+function downloadDir() {
+    window.open('/api/files/download-dir?path=' + encodeURIComponent(CURRENT_PATH));
+}
+
+function getFileIcon(ext) {
+    var icons = {'.py':'🐍','.js':'📜','.html':'🌐','.css':'🎨','.json':'📋','.txt':'📄','.md':'📝','.yml':'⚙','.yaml':'⚙','.toml':'⚙','.png':'🖼','.jpg':'🖼','.jpeg':'🖼','.gif':'🖼','.svg':'🖼','.ico':'🖼','.zip':'📦','.rar':'📦','.7z':'📦','.exe':'⚡','.bat':'⚡','.sh':'⚡','.log':'📜','.csv':'📊','.xml':'📋'};
+    return icons[ext] || '📄';
+}
+
+function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+    return (bytes/1048576).toFixed(1) + ' MB';
+}
+
+function formatTime(ts) {
+    var d = new Date(ts * 1000);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+
+function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function uploadFiles(files) {
+    if (!files || files.length === 0) return;
+    var form = new FormData();
+    form.append('path', CURRENT_PATH);
+    for (var i = 0; i < files.length; i++) {
+        form.append('file', files[i]);
+    }
+    fetch('/api/files/upload', { method:'POST', body:form })
+    .then(function(r){return r.json()})
+    .then(function(d){
+        if(d.success){ showToast('上传成功', 'success'); loadFiles(); }
+        else { showToast(d.error||'上传失败', 'error'); }
+    })
+    .catch(function(){ showToast('请求失败', 'error'); });
+    document.getElementById('uploadInput').value = '';
+}
+
+function deleteItem(path, isDir) {
+    var label = isDir ? '文件夹' : '文件';
+    showConfirm('确定删除' + label + ' "' + path.split('/').pop().split('\\').pop() + '" 吗？', function(ok) {
+        if (!ok) return;
+        fetch('/api/files/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:path}) })
+        .then(function(r){return r.json()})
+        .then(function(d){
+            if(d.success){ showToast('已删除', 'success'); loadFiles(); }
+            else { showToast(d.error||'删除失败', 'error'); }
+        });
+    });
+}
+
+function renameItem(path) {
+    var oldName = path.split('/').pop().split('\\').pop();
+    var newName = prompt('输入新名称：', oldName);
+    if (!newName || newName === oldName) return;
+    fetch('/api/files/rename', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:path, new_name:newName}) })
+    .then(function(r){return r.json()})
+    .then(function(d){
+        if(d.success){ showToast('已重命名', 'success'); loadFiles(); }
+        else { showToast(d.error||'重命名失败', 'error'); }
+    });
+}
+
+var MOVE_COPY_PATH = '';
+var MOVE_COPY_IS_DIR = false;
+var MOVE_COPY_MODE = '';
+
+function showMoveCopy(path, isDir) {
+    MOVE_COPY_PATH = path;
+    MOVE_COPY_IS_DIR = isDir;
+    document.getElementById('moveCopyTitle').textContent = '移动';
+    document.getElementById('moveCopyDesc').textContent = (isDir ? '文件夹' : '文件') + ': ' + path.split('/').pop().split('\\').pop();
+    document.getElementById('moveCopyPath').value = '';
+    document.getElementById('moveCopyConfirmBtn').textContent = '移动';
+    MOVE_COPY_MODE = 'move';
+    document.getElementById('moveCopyModal').classList.add('active');
+}
+
+function confirmMoveCopy() {
+    var dest = document.getElementById('moveCopyPath').value.trim();
+    if (!dest) { showToast('请输入目标路径', 'error'); return; }
+    var isCopy = MOVE_COPY_MODE === 'copy';
+    var url = isCopy ? '/api/files/copy' : '/api/files/move';
+    fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:MOVE_COPY_PATH, destination:dest}) })
+    .then(function(r){return r.json()})
+    .then(function(d){
+        if(d.success){ showToast(isCopy?'已复制':'已移动', 'success'); closeMoveCopy(); loadFiles(); }
+        else { showToast(d.error||'操作失败', 'error'); }
+    });
+}
+
+function closeMoveCopy() {
+    document.getElementById('moveCopyModal').classList.remove('active');
+}
+
+function showNewFolder() {
+    var name = prompt('输入文件夹名称：');
+    if (!name) return;
+    var path = CURRENT_PATH ? CURRENT_PATH + '/' + name : name;
+    fetch('/api/files/mkdir', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:path}) })
+    .then(function(r){return r.json()})
+    .then(function(d){
+        if(d.success){ showToast('已创建', 'success'); loadFiles(); }
+        else { showToast(d.error||'创建失败', 'error'); }
+    });
+}
+
+function doSearch() {
+    var q = document.getElementById('searchInput').value.trim();
+    if (!q) return;
+    IS_SEARCH = true;
+    document.getElementById('clearSearchBtn').style.display = 'inline-flex';
+    document.getElementById('downloadDirBtn').style.display = 'none';
+    loadFiles();
+}
+
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    IS_SEARCH = false;
+    document.getElementById('clearSearchBtn').style.display = 'none';
+    loadFiles();
+}
+
+var EDITOR_PATH = '';
+
+function openEditor(path) {
+    EDITOR_PATH = path;
+    document.getElementById('editorTitle').textContent = '编辑: ' + path.split('/').pop().split('\\').pop();
+    document.getElementById('editorContent').value = '加载中...';
+    document.getElementById('editorModal').classList.add('active');
+    fetch('/api/files/read?path='+encodeURIComponent(path))
+    .then(function(r){return r.json()})
+    .then(function(d){
+        if(d.success){ document.getElementById('editorContent').value = d.data.content; }
+        else { showToast(d.error||'加载失败', 'error'); document.getElementById('editorContent').value = ''; }
+    });
+}
+
+function saveEditor() {
+    var content = document.getElementById('editorContent').value;
+    fetch('/api/files/save', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:EDITOR_PATH, content:content}) })
+    .then(function(r){return r.json()})
+    .then(function(d){
+        if(d.success){ showToast('已保存', 'success'); closeEditor(); loadFiles(); }
+        else { showToast(d.error||'保存失败', 'error'); }
+    });
+}
+
+function closeEditor() {
+    document.getElementById('editorModal').classList.remove('active');
+    EDITOR_PATH = '';
+}
+
+document.addEventListener('DOMContentLoaded', function(){ loadFiles(); });
+</script>
+{% endblock %}

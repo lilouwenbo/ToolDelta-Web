@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% set active_page = "market" %}
+{% block content %}
+<div class="page-header">
+    <h1>插件市场</h1>
+    <span id="marketCount" style="font-size:13px;color:var(--text-secondary)"></span>
+</div>
+
+<div class="search-bar">
+    <input type="text" id="marketSearch" placeholder="搜索插件名/作者..." oninput="renderMarket()">
+    <select id="marketSearchBy" onchange="renderMarket()">
+        <option value="name">按名称</option>
+        <option value="author">按作者</option>
+    </select>
+</div>
+
+<div id="marketList" class="plugin-grid"></div>
+
+<!-- Market Detail Modal -->
+<div class="modal-overlay" id="marketDetailModal">
+    <div class="modal">
+        <h2 id="marketDetailName"></h2>
+        <div id="marketDetailBody" style="font-size:13px"></div>
+        <div class="modal-actions">
+            <button class="btn btn-success" id="marketInstallBtn" onclick="installFromMarket()">安装此插件</button>
+            <button class="btn btn-outline" onclick="closeModal('marketDetailModal')">关闭</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var marketPlugins = [];
+var selectedPluginId = null;
+
+function loadMarket() {
+    fetch('/api/market/plugins')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            marketPlugins = d;
+            document.getElementById('marketCount').textContent = '共 ' + d.length + ' 个插件';
+            renderMarket();
+        });
+}
+
+function renderMarket() {
+    var q = document.getElementById('marketSearch').value.toLowerCase();
+    var by = document.getElementById('marketSearchBy').value;
+    var list = marketPlugins;
+    if (q) {
+        if (by === 'name') list = marketPlugins.filter(function(p) { return p.name.toLowerCase().indexOf(q) !== -1 || p.id.toLowerCase().indexOf(q) !== -1; });
+        else list = marketPlugins.filter(function(p) { return p.author.toLowerCase().indexOf(q) !== -1; });
+    }
+    var container = document.getElementById('marketList');
+    if (list.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">---</div>未找到插件</div>';
+        return;
+    }
+    container.innerHTML = list.map(function(p) {
+        return '<div class="plugin-card">' +
+            '<div class="p-name">' + p.name + '</div>' +
+            '<div class="p-meta">v' + p.version + ' | ' + p.author + ' | <span class="tag tag-classic">' + (p.plugin_type || 'classic') + '</span></div>' +
+            '<div class="p-desc">' + (p.description || '暂无描述') + '</div>' +
+            '<div class="p-actions">' +
+            '<button class="btn btn-sm btn-outline" onclick="showMarketDetail(\'' + p.id + '\')">详情</button>' +
+            '<button class="btn btn-sm btn-success" onclick="quickInstall(\'' + p.id + '\')">安装</button>' +
+            '</div></div>';
+    }).join('');
+}
+
+function showMarketDetail(pid) {
+    selectedPluginId = pid;
+    var p = null;
+    for (var i = 0; i < marketPlugins.length; i++) {
+        if (marketPlugins[i].id === pid) { p = marketPlugins[i]; break; }
+    }
+    if (!p) return;
+    document.getElementById('marketDetailName').textContent = p.name + ' v' + p.version;
+
+    var prePlugins = '无';
+    if (p.pre_plugins) {
+        var keys = Object.keys(p.pre_plugins);
+        if (keys.length > 0) {
+            prePlugins = keys.map(function(k) { return k + ' >= v' + p.pre_plugins[k]; }).join(', ');
+        }
+    }
+
+    document.getElementById('marketDetailBody').innerHTML =
+        '<table>' +
+        '<tr><td style="width:100px">作者</td><td>' + p.author + '</td></tr>' +
+        '<tr><td>插件ID</td><td>' + p.id + '</td></tr>' +
+        '<tr><td>类型</td><td>' + (p.plugin_type || 'classic') + '</td></tr>' +
+        '<tr><td>前置依赖</td><td>' + prePlugins + '</td></tr>' +
+        '<tr><td>描述</td><td>' + (p.description || '无') + '</td></tr>' +
+        '</table>';
+    document.getElementById('marketInstallBtn').textContent = '安装 ' + p.name;
+    document.getElementById('marketDetailModal').classList.add('active');
+}
+
+function installFromMarket() {
+    if (!selectedPluginId) return;
+    fetch('/api/plugins/install-preset', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({plugin_id: selectedPluginId}) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) { showToast(d.message + ' 安装成功', 'success'); closeModal('marketDetailModal'); }
+            else showToast(d.error || '安装失败', 'error');
+        });
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+}
+
+function quickInstall(pid) {
+    fetch('/api/plugins/install-preset', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({plugin_id: pid}) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) showToast(d.message + ' 安装成功', 'success');
+            else showToast(d.error || '安装失败', 'error');
+        });
+}
+
+loadMarket();
+</script>
+{% endblock %}
