@@ -19,7 +19,7 @@
     <div class="fav-strip" id="favStrip" aria-label="常用命令"></div>
     <div class="console-body" id="consoleBody" role="log" aria-label="控制台输出" tabindex="0"></div>
     <div class="console-foot">
-        <input id="consoleInput" placeholder="输入命令...（↑/↓ 翻历史，Tab 补全）" autocomplete="off" aria-label="命令输入">
+        <input id="consoleInput" placeholder="输入命令...（↑/↓ 翻历史，Tab 补全）" autocomplete="off" inputmode="text" enterkeyhint="send" aria-label="命令输入">
         <button class="console-send-btn" onclick="sendConsoleInput()" aria-label="发送命令">发送</button>
     </div>
 </div>
@@ -44,7 +44,12 @@
   background:var(--danger); box-shadow:0 0 8px var(--danger);
   transition: background .2s, box-shadow .2s;
 }
+/* 现代浏览器：连接状态时圆点变绿 */
 .console-bar:has(.status-conn.connected)::before {
+  background:var(--success); box-shadow:0 0 8px var(--success);
+}
+/* 旧版安卓 Chrome 不支持 :has() 的降级：通过 JS 给 .console-bar 加 .is-connected 类 */
+.console-bar.is-connected::before {
   background:var(--success); box-shadow:0 0 8px var(--success);
 }
 .status-conn.connected { color: var(--success); }
@@ -57,12 +62,13 @@
 @keyframes pulse { 0%,100%{ transform: scale(1); } 50%{ transform: scale(1.05); } }
 #copyAllBtn, #scrollBottomBtn { margin-left: auto; }
 #scrollBottomBtn { margin-left: 0; }
-.fav-strip { display:flex; flex-wrap:wrap; gap:6px; padding:8px 12px; background:rgba(255,255,255,0.03); border-bottom:1px solid var(--hairline); min-height:34px; align-items:center; }
-.fav-empty { font-size:12px; color:var(--ink-tertiary); }
+.fav-strip { display:flex; flex-wrap:nowrap; gap:6px; padding:8px 12px; background:rgba(255,255,255,0.03); border-bottom:1px solid var(--hairline); min-height:34px; align-items:center; overflow-x:auto; -webkit-overflow-scrolling: touch; }
+.fav-empty { font-size:12px; color:var(--ink-tertiary); white-space:nowrap; }
 .fav-chip {
   cursor:pointer; border:1px solid var(--hairline); background:var(--surface-1); color:var(--ink);
   border-radius:var(--r-sm); padding:3px 10px; font-size:12px; font-family:inherit;
   max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  flex-shrink:0;
   transition: all .15s var(--ease);
 }
 .fav-chip:hover { border-color:var(--primary); color:var(--ink); background:rgba(94,106,210,0.15); box-shadow:0 0 0 3px rgba(94,106,210,0.12); }
@@ -76,6 +82,13 @@
     #050608;
   box-shadow: inset 0 0 50px rgba(0,0,0,0.6);
   scrollbar-width: thin; scrollbar-color: var(--hairline-strong) transparent;
+}
+/* 移动端控制台高度：覆盖上方 440px 默认值（内联 style 优先级最高，故需 !important） */
+@media (max-width: 768px) {
+  .console-body { height: 40vh !important; max-height: 50vh; }
+}
+@media (max-width: 400px) {
+  .console-body { height: 32vh !important; font-size: 11px; }
 }
 .console-body > div { padding:1px 4px; border-radius:4px; transition: background .12s; }
 .console-body > div:hover { background: rgba(255,255,255,0.04); }

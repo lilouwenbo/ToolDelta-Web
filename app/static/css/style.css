@@ -1,5 +1,8 @@
 :root {
   --sidebar-width: 180px;
+  /* color-scheme：让浏览器原生控件（select option 列表、滚动条、date picker）
+     跟随深色主题，避免白底刺眼。 */
+  color-scheme: dark;
 
   /* Linear-inspired dark palette */
   --canvas: #010102;
@@ -271,6 +274,14 @@ pre { white-space: pre-wrap; word-break: break-all; }
   margin-bottom: 16px;
   letter-spacing: -0.2px;
 }
+/* 卡片标题支持 h2（保持与 h3 一致的视觉，用于修正标题层级 h1→h2 跳级） */
+.card h2 {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  margin-bottom: 16px;
+  letter-spacing: -0.2px;
+}
 
 /* ─── Stats ─── */
 
@@ -334,7 +345,10 @@ pre { white-space: pre-wrap; word-break: break-all; }
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+  text-decoration: none; /* <a class="btn"> 不应有下划线 */
 }
+/* <a> 渲染为按钮时，继承颜色 */
+a.btn { color: inherit; }
 .btn-primary { background: var(--primary); color: #fff; }
 .btn-primary:hover { background: var(--primary-hover); }
 .btn-success { background: var(--success); color: #fff; }
@@ -433,6 +447,43 @@ tr:hover td { background: var(--surface-2); }
 .modal h2 { margin-bottom: 20px; font-size: 18px; font-weight: 600; color: var(--ink); }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 24px; }
 
+/* 移动端模态：操作栏吸底 + 边距 + 紧凑 */
+@media (max-width: 768px) {
+  .modal {
+    width: 94%;
+    max-width: none;
+    margin: 0 auto;
+    padding: 18px 16px 80px; /* 底部留空给吸底操作栏 */
+    max-height: 88vh;
+    border-radius: var(--r-lg);
+  }
+  .modal h2 { font-size: 17px; margin-bottom: 14px; }
+  /* 操作栏吸底：长表单滚动后仍可见 */
+  .modal .modal-actions {
+    position: sticky;
+    bottom: -16px;
+    margin: 24px -16px -80px;
+    padding: 12px 16px;
+    background: var(--surface-1);
+    border-top: 1px solid var(--hairline);
+    z-index: 5;
+  }
+  /* tabs 移动端横向滚动：避免 4 个 tab 挤压 */
+  .tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab-btn { white-space: nowrap; padding: 10px 14px; }
+  /* 隐藏 number input 原生上下箭头：移动端易误触 */
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none; margin: 0;
+  }
+  input[type=number] { -moz-appearance: textfield; }
+}
+
 /* ─── Plugin Cards ─── */
 
 .plugin-grid {
@@ -489,6 +540,7 @@ tr:hover td { background: var(--surface-2); }
 .toast-container {
   position: fixed; top: 20px; right: 20px; z-index: 9999;
 }
+
 .toast {
   background: var(--surface-2);
   border: 1px solid var(--hairline);
@@ -555,6 +607,19 @@ tr:hover td { background: var(--surface-2); }
 }
 .check-list label:hover { background: var(--surface-2); }
 
+/* ─── 数据文件行（插件详情 → 数据 Tab） ─── */
+.data-file-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; font-size: 13px;
+  border-bottom: 1px solid var(--hairline);
+  gap: 8px;
+}
+.data-file-row:last-child { border-bottom: none; }
+.data-file-row > span {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
 /* ─── Command Card ─── */
 
 .cmd-card {
@@ -573,6 +638,12 @@ tr:hover td { background: var(--surface-2); }
   transition: background 0.12s;
 }
 .cmd-card .cmd-header:hover { background: var(--surface-3); }
+/* 键盘聚焦时高亮（cmd-header / th[role=button] 已可 Tab 聚焦） */
+.cmd-card .cmd-header:focus-visible,
+th[role="button"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
 .cmd-card .cmd-body { padding: 12px 16px; }
 .cmd-row {
   display: flex;
@@ -606,6 +677,9 @@ tr:hover td { background: var(--surface-2); }
   display: inline-block;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* 可访问性：spinner 自动获得 role/aria，loading-text 自动 aria-live */
+.spinner[role="status"]::before { content: ''; } /* 占位，实际通过 JS 设属性 */
 
 /* ─── Scrollbar ─── */
 
@@ -656,6 +730,10 @@ hr {
     transition: transform 0.3s var(--ease, ease);
     z-index: 200;
     width: 220px;
+    /* 超长 nav 列表安全：限制最大高度并保持内部滚动 */
+    max-height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   body.sidebar-open .sidebar { transform: translateX(0); }
   body.sidebar-open .sidebar-backdrop {
@@ -665,6 +743,8 @@ hr {
     backdrop-filter: blur(2px);
     animation: depFade 0.2s ease;
   }
+  /* backdrop 淡出过渡：通过 transition 而非瞬间消失 */
+  .sidebar-backdrop { transition: opacity 0.25s var(--ease, ease); }
   .sidebar-toggle-btn {
     display: flex !important;
     position: fixed; top: 14px; left: 14px; z-index: 201;
@@ -698,50 +778,210 @@ hr {
   .stat-card { padding: 16px; }
   .search-bar { flex-direction: column; }
   .modal { width: 95%; padding: 20px; max-height: 85vh; }
+
+  /* 移动端 toast：避开刘海、宽度自适应、触控友好 */
+  .toast-container {
+    top: max(12px, env(safe-area-inset-top));
+    left: 12px; right: 12px;
+  }
+  .toast {
+    min-width: 0; max-width: none; width: 100%;
+    padding: 12px 14px;
+  }
+  /* 空状态：缩小内边距，避免移动端浪费空间 */
+  .empty-state { padding: 32px 20px; }
+  .empty-state .icon { font-size: 28px; }
+  /* check-list 移动端限高：避免单列表占满全屏 */
+  .check-list { max-height: 220px; }
+  /* cmd-row 移动端堆叠：triggers/hint/usage 三列变垂直 */
+  .cmd-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .cmd-row .triggers, .cmd-row .hint { min-width: 0; }
+  /* stat-value 数字在窄屏可能截断，缩小字号 */
+  .stat-card .stat-value { font-size: 22px; }
 }
 
-/* ─── Android / 移动端深度适配 ─── */
+/* ── 横屏适配（landscape，高度 ≤500px）：安卓横屏键盘/地址栏挤压 ── */
+@media (max-height: 500px) and (orientation: landscape) {
+  :root { --sidebar-width: 56px; }
+  /* 横屏时 sidebar 收窄为图标条，腾出横向空间 */
+  .sidebar { width: 56px !important; }
+  .sidebar .brand .brand-name,
+  .sidebar nav a .nav-label,
+  .sidebar nav a span:not(.nav-ico),
+  .sidebar-footer .user-name { display: none; }
+  /* 主题按钮仅保留 emoji，隐藏文字 */
+  .sidebar-footer .theme-toggle { font-size: 0; padding: 8px; }
+  .sidebar-footer .theme-toggle::first-letter { font-size: 16px; }
+  .sidebar .brand { padding: 14px 8px; justify-content: center; }
+  .sidebar nav a { padding: 12px 8px; justify-content: center; }
+  .sidebar .nav-ico { margin-right: 0; }
+  .main-content { margin-left: 56px; padding: 48px 12px 12px; }
+  /* 控制台横屏：用 vh 兜底，避免过矮 */
+  .console-body { height: 50vh !important; }
+  .page-header { margin-bottom: 16px; }
+  .page-header h1 { font-size: 18px; }
+  .card { padding: 12px; }
+}
+
+/* ── 平板适配（768-1024px）：sidebar 常驻但收窄 ── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  :root { --sidebar-width: 160px; }
+  .main-content { padding: 20px 18px; }
+  .plugin-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+}
+
+/* ─── Android / 移动端深度适配（增强版） ─── */
+
+/* 1. 软键盘弹起时：让视口自动滚动到聚焦的输入框，避免被遮挡
+      使用 html scroll-behavior + 自定义 visualViewport 处理（见 base.html 脚本） */
+/* 桌面端保留默认即时滚动；仅移动端开启 smooth（配合 visualViewport scrollIntoView） */
+@media (max-width: 900px) { html { scroll-behavior: smooth; } }
+@supports (height: 100dvh) {
+  /* 动态视口高度：解决安卓浏览器地址栏伸缩导致 100vh 抖动 */
+  .console-body { height: 40dvh; }
+}
+@media (max-width: 768px) {
+  .console-body { height: 38vh; max-height: 50vh; }
+  /* 控制台输入栏：吸底固定，软键盘弹起时随 visualViewport 上移（JS 处理） */
+  .console-foot { position: sticky; bottom: 0; background: var(--surface-2); z-index: 10; }
+}
+
+/* 2. 触摸优化：移除 300ms 点击延迟（声明 touch-action）+ 移除灰色点击高亮 */
+button, a, input, select, textarea, .toast, .plugin-card, .stat-card,
+.nav-item, .cmd-header, .fav-chip, .up-btn, .breadcrumb-link {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 3. 触摸目标最小尺寸 44×44px（WCAG / Material Design 规范） */
+@media (max-width: 768px) {
+  .btn { min-height: 44px; min-width: 44px; padding: 10px 16px; }
+  .btn-sm { min-height: 40px; padding: 8px 12px; }
+  .sidebar nav a { min-height: 48px; padding: 14px 18px; }
+  .fav-chip { min-height: 36px; padding: 8px 14px; }
+  /* 复选框触控区域放大 */
+  .table input[type=checkbox] { width: 22px; height: 22px; }
+}
+
+/* 4. 长列表滚动惯性：使用 -webkit-overflow-scrolling */
+.table-wrap, .console-body, .modal-overlay, .sidebar nav,
+.logs-body, .plugin-grid, .market-grid {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; /* 防止滚动穿透到背景 */
+}
+
+/* 5. 表格水平滚动优化（移动端不挤窄列） */
+@media (max-width: 768px) {
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table { min-width: 500px; } /* 强制最小宽度，触发横向滚动而非压缩 */
+  .table th, .table td { white-space: nowrap; }
+}
+
+/* 6. 选中文本颜色：避免安卓默认蓝色突兀 */
+::selection { background: rgba(94,106,210,0.3); }
+
+/* 7. 禁用长按菜单（避免移动端长按图片/链接弹出系统菜单） */
+img, a, .nav-ico { -webkit-touch-callout: none; }
+
+/* 8. 侧边栏滑动手势提示：打开时 backdrop 可点击关闭（已有），增加滑动关闭 */
+@media (max-width: 900px) {
+  body.sidebar-open .sidebar-backdrop { cursor: pointer; }
+}
+
+/* 9. 模态框在移动端：竖向滚动 + 底部操作栏吸底 */
+@media (max-width: 768px) {
+  .modal-overlay { padding: 0; align-items: stretch; }
+  .modal {
+    width: 100% !important; max-width: 100% !important;
+    min-height: 100dvh; border-radius: 0; padding: 56px 16px 80px;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+  }
+  .modal .modal-actions {
+    position: sticky; bottom: -16px; margin: 24px -16px -16px;
+    padding: 12px 16px; background: var(--surface-2);
+    border-top: 1px solid var(--hairline); z-index: 5;
+  }
+  .modal-lg { min-height: 100dvh; }
+}
+
+/* 10. 页面头部操作按钮：移动端横向滚动而非换行 */
+@media (max-width: 768px) {
+  .page-header .form-row { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .page-header .form-row .btn { flex-shrink: 0; }
+}
+
+/* 11. 仪表盘统计卡：移动端 2 列紧凑布局 */
+@media (max-width: 768px) {
+  .stat-card { padding: 14px; }
+  .stat-card .stat-value { font-size: 24px; }
+  .stat-card .stat-label { font-size: 11px; }
+}
+
+/* 12. 安卓端控制台输入：增大发送按钮触控区 */
+@media (max-width: 768px) {
+  .console-send-btn { padding: 12px 20px; min-width: 64px; }
+  .console-foot input { flex: 1; }
+}
+
+/* 13. 命令参考分组：移动端默认折叠 */
+@media (max-width: 768px) {
+  .cmd-header { padding: 14px 12px; }
+  .cmd-card { padding: 12px; }
+}
+
+/* 14. 防止移动端双击缩放（viewport 已设 maximum-scale，此处补 touch-action） */
+body { touch-action: pan-x pan-y; }
+
+/* 15. Android 软键盘弹起补偿：body.kbd-open 时吸底元素上移，避免被键盘遮挡 */
+body.kbd-open .console-foot { bottom: 0; }
+body.kbd-open .modal .modal-actions {
+  /* 模态操作栏：键盘弹起时吸在键盘上方，而非页面底部 */
+  position: fixed; left: 0; right: 0; bottom: 0;
+  margin: 0; border-radius: 0;
+  padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+}
+@media (max-width: 768px) {
+  body.kbd-open .main-content { padding-bottom: 0; }
+  /* 控制台输入栏在键盘弹起时贴键盘上方（配合 visualViewport） */
+  body.kbd-open .console-foot {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    padding-right: 14px;
+  }
+}
+
+
+/* ─── Android / 移动端适配（补充：字号防缩放 + form-row 堆叠） ─── */
 @media (max-width: 768px) {
   /* 输入框字号设为 16px：防止 iOS/Android 聚焦时自动缩放页面 */
   .form-control, input[type="text"], input[type="password"], input[type="number"],
   input[type="search"], select, textarea {
     font-size: 16px !important;
   }
-  /* 控制台输出区：移动端缩短高度并使用更小字号 */
-  .console-body { height: 300px; font-size: 12px; }
   .console-foot input { font-size: 16px; }
-  /* 触控目标最小 44px（Android Material 设计规范） */
-  .btn { min-height: 40px; }
-  .btn-sm { min-height: 36px; }
   /* 表格行间距加大，便于触控滚动 */
   .table tbody td { padding: 10px 8px; }
-  /* 模态框竖向滚动：避免移动端内容超出视口 */
-  .modal-overlay { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 20px 0; }
-  .modal { max-width: 94% !important; }
-  /* form-row 在窄屏堆叠 */
-  .form-row { flex-direction: column; gap: 0; }
-  .form-row .form-group { flex: 1 1 auto; margin-bottom: 14px; }
+  /* form-row 在窄屏堆叠（页面头部除外，已横向滚动） */
+  .card .form-row { flex-direction: column; gap: 0; }
+  .card .form-row .form-group { flex: 1 1 auto; margin-bottom: 14px; }
   .form-group--narrow { flex: 1 1 auto; }
   /* 页面标题缩小 */
   .page-header h1 { font-size: 20px; }
-  /* 状态卡网格：2 列以节省纵向空间 */
-  .stat-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* 超窄屏（≤400px，小屏 Android 手机） */
 @media (max-width: 400px) {
   .main-content { padding: 56px 8px 12px; }
   .stat-grid { grid-template-columns: 1fr; }
-  .console-body { height: 240px; font-size: 11px; }
-  .modal { padding: 16px; }
+  .console-body { height: 220px; font-size: 11px; }
   .page-header h1 { font-size: 18px; }
   .card { padding: 12px; }
 }
 
-/* 安全区适配：刘海屏 / 全面屏底部 home indicator */
+/* 安全区适配：刘海屏 / 全面屏顶部 status bar + 底部 home indicator */
 @supports (padding: max(0px)) {
   .sidebar-footer { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
   .main-content { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .sidebar-toggle-btn { top: max(14px, env(safe-area-inset-top)); }
 }
 
 /* 移动端控制台输入框：禁用自动大写/自动纠正，提升命令输入体验 */
@@ -820,6 +1060,8 @@ body.theme-light {
   --surface-4: #e2e7f0;
   --ink: #1a1d23;
   --ink-muted: #3a4150;
+  /* 浅色主题：原生控件跟随 */
+  color-scheme: light;
   --ink-subtle: #6b7280;
   --ink-tertiary: #9aa3b2;
   --hairline: #dde2ea;
@@ -963,6 +1205,20 @@ body.theme-light .console-wrap { box-shadow: 0 1px 3px rgba(20, 30, 60, 0.08); }
 
 ::selection { background: rgba(94, 106, 210, 0.38); color: #fff; }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+/* 纯触屏设备（无键盘/鼠标）：移除 focus-visible outline，避免误触残留焦点环 */
+@media (hover: none) and (pointer: coarse) {
+  :focus-visible { outline: none; }
+  :focus { outline: none; }
+}
+/* 尊重用户「减少动态」偏好：关闭非必要动画 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 /* ── 壁纸：多层径向辉光，营造 Liquid Glass 景深 ── */
 .wallpaper-bg::after {
@@ -1270,7 +1526,8 @@ th { position: sticky; top: 0; background: var(--surface-1); }
    持续 UI / 动画打磨（参考 GitHub / Linear / Vercel 现代设计语言）
    ════════════════════════════════════════════════════════════════ */
 
-:root { --ease: cubic-bezier(0.2, 0.9, 0.3, 1); }
+/* 注：--ease 已在上方 :root 中统一定义（cubic-bezier(0.22, 1, 0.36, 1)），
+   此处不再重复定义，避免覆盖导致曲线不一致。 */
 
 /* ─── 依赖安装方式选择卡片（本地离线 / 网络在线） ─── */
 .dep-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 6px; }

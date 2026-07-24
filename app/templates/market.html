@@ -7,8 +7,8 @@
 </div>
 
 <div class="search-bar">
-    <input type="text" id="marketSearch" placeholder="搜索插件名/作者..." oninput="renderMarket()">
-    <select id="marketSearchBy" onchange="renderMarket()">
+    <input type="text" id="marketSearch" placeholder="搜索插件名/作者..." inputmode="search" enterkeyhint="search" oninput="renderMarket()" aria-label="搜索插件">
+    <select id="marketSearchBy" onchange="renderMarket()" aria-label="搜索方式">
         <option value="name">按名称</option>
         <option value="author">按作者</option>
     </select>
@@ -17,7 +17,7 @@
 <div id="marketList" class="plugin-grid"></div>
 
 <!-- Market Detail Modal -->
-<div class="modal-overlay" id="marketDetailModal">
+<div class="modal-overlay" id="marketDetailModal" role="dialog" aria-modal="true" aria-labelledby="marketDetailName">
     <div class="modal">
         <h2 id="marketDetailName"></h2>
         <div id="marketDetailBody" style="font-size:13px"></div>
@@ -34,14 +34,24 @@
 var marketPlugins = [];
 var selectedPluginId = null;
 
+// 转义服务端数据，防止注入到 innerHTML
+function _mEsc(s) {
+    if (s === null || s === undefined) return '';
+    return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function loadMarket() {
     fetch('/api/market/plugins')
         .then(function(r) { return r.json(); })
         .then(function(d) {
             marketPlugins = d;
-            document.getElementById('marketCount').textContent = '共 ' + d.length + ' 个插件';
+            var mc = document.getElementById('marketCount');
+            if (mc) mc.textContent = '共 ' + d.length + ' 个插件';
             renderMarket();
-        });
+        })
+        .catch(function() { showToast('加载市场失败', 'error'); });
 }
 
 function renderMarket() {
@@ -53,18 +63,21 @@ function renderMarket() {
         else list = marketPlugins.filter(function(p) { return p.author.toLowerCase().indexOf(q) !== -1; });
     }
     var container = document.getElementById('marketList');
+    if (!container) return;
     if (list.length === 0) {
         container.innerHTML = '<div class="empty-state"><div class="icon" aria-hidden="true">🛒</div>未找到插件<p class="empty-hint">尝试更换关键词或市场源</p></div>';
         return;
     }
     container.innerHTML = list.map(function(p) {
+        // JSON.stringify 已转义双引号；再 _mEsc 处理属性边界，避免引号闭合逃逸
+        var idAttr = _mEsc(JSON.stringify(p.id));
         return '<div class="plugin-card">' +
-            '<div class="p-name">' + p.name + '</div>' +
-            '<div class="p-meta">v' + p.version + ' | ' + p.author + ' | <span class="tag tag-classic">' + (p.plugin_type || 'classic') + '</span></div>' +
-            '<div class="p-desc">' + (p.description || '暂无描述') + '</div>' +
+            '<div class="p-name">' + _mEsc(p.name) + '</div>' +
+            '<div class="p-meta">v' + _mEsc(p.version) + ' | ' + _mEsc(p.author) + ' | <span class="tag tag-classic">' + _mEsc(p.plugin_type || 'classic') + '</span></div>' +
+            '<div class="p-desc">' + _mEsc(p.description || '暂无描述') + '</div>' +
             '<div class="p-actions">' +
-            '<button class="btn btn-sm btn-outline" onclick="showMarketDetail(\'' + p.id + '\')">详情</button>' +
-            '<button class="btn btn-sm btn-success" onclick="quickInstall(\'' + p.id + '\')">安装</button>' +
+            '<button class="btn btn-sm btn-outline" onclick="showMarketDetail(' + idAttr + ')">详情</button>' +
+            '<button class="btn btn-sm btn-success" onclick="quickInstall(' + idAttr + ')">安装</button>' +
             '</div></div>';
     }).join('');
 }
@@ -76,7 +89,8 @@ function showMarketDetail(pid) {
         if (marketPlugins[i].id === pid) { p = marketPlugins[i]; break; }
     }
     if (!p) return;
-    document.getElementById('marketDetailName').textContent = p.name + ' v' + p.version;
+    var nameEl = document.getElementById('marketDetailName');
+    if (nameEl) nameEl.textContent = p.name + ' v' + p.version;
 
     var prePlugins = '无';
     if (p.pre_plugins) {
@@ -86,30 +100,35 @@ function showMarketDetail(pid) {
         }
     }
 
-    document.getElementById('marketDetailBody').innerHTML =
-        '<table>' +
-        '<tr><td style="width:100px">作者</td><td>' + p.author + '</td></tr>' +
-        '<tr><td>插件ID</td><td>' + p.id + '</td></tr>' +
-        '<tr><td>类型</td><td>' + (p.plugin_type || 'classic') + '</td></tr>' +
-        '<tr><td>前置依赖</td><td>' + prePlugins + '</td></tr>' +
-        '<tr><td>描述</td><td>' + (p.description || '无') + '</td></tr>' +
-        '</table>';
-    document.getElementById('marketInstallBtn').textContent = '安装 ' + p.name;
-    document.getElementById('marketDetailModal').classList.add('active');
+    var bodyEl = document.getElementById('marketDetailBody');
+    if (bodyEl) {
+        bodyEl.innerHTML =
+            '<table>' +
+            '<tr><td style="width:100px">作者</td><td>' + _mEsc(p.author) + '</td></tr>' +
+            '<tr><td>插件ID</td><td>' + _mEsc(p.id) + '</td></tr>' +
+            '<tr><td>类型</td><td>' + _mEsc(p.plugin_type || 'classic') + '</td></tr>' +
+            '<tr><td>前置依赖</td><td>' + _mEsc(prePlugins) + '</td></tr>' +
+            '<tr><td>描述</td><td>' + _mEsc(p.description || '无') + '</td></tr>' +
+            '</table>';
+    }
+    var btn = document.getElementById('marketInstallBtn');
+    if (btn) btn.textContent = '安装 ' + p.name;
+    var modal = document.getElementById('marketDetailModal');
+    if (modal) modal.classList.add('active');
 }
 
 function installFromMarket() {
     if (!selectedPluginId) return;
+    var btn = document.getElementById('marketInstallBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '安装中...'; }
     fetch('/api/plugins/install-preset', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({plugin_id: selectedPluginId}) })
         .then(function(r) { return r.json(); })
         .then(function(d) {
             if (d.success) { showToast(d.message + ' 安装成功', 'success'); closeModal('marketDetailModal'); }
             else showToast(d.error || '安装失败', 'error');
-        });
-}
-
-function closeModal(id) {
-    document.getElementById(id).classList.remove('active');
+        })
+        .catch(function() { showToast('请求失败', 'error'); })
+        .finally(function() { if (btn) { btn.disabled = false; btn.textContent = '安装此插件'; } });
 }
 
 function quickInstall(pid) {
@@ -118,7 +137,8 @@ function quickInstall(pid) {
         .then(function(d) {
             if (d.success) showToast(d.message + ' 安装成功', 'success');
             else showToast(d.error || '安装失败', 'error');
-        });
+        })
+        .catch(function() { showToast('请求失败', 'error'); });
 }
 
 loadMarket();

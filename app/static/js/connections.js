@@ -1,31 +1,38 @@
 // 服务器连接配置前端逻辑
 
+// 连接列表缓存：避免编辑时再次拉取全列表
+var _connCache = [];
+
 function loadConnections() {
     fetch('/api/connections')
         .then(function (r) { return r.json(); })
         .then(function (list) {
+            _connCache = list || [];
             var tbody = document.getElementById('connTableBody');
             var empty = document.getElementById('connEmpty');
-            if (!list || list.length === 0) {
+            if (!tbody) return;
+            if (!_connCache.length) {
                 tbody.innerHTML = '';
-                empty.style.display = 'block';
+                if (empty) empty.style.display = 'block';
                 return;
             }
-            empty.style.display = 'none';
-            tbody.innerHTML = list.map(function (c) {
+            if (empty) empty.style.display = 'none';
+            tbody.innerHTML = _connCache.map(function (c) {
                 var addr = (c.host || '') + ':' + (c.port != null ? c.port : '');
                 var def = c.is_default
                     ? '<span class="badge-default">默认</span>'
                     : '<span class="badge-normal">—</span>';
+                // 转义 c.id 防止 onclick 属性上下文注入（单引号闭合）
+                var eid = escapeHtml(c.id || '');
                 return '<tr>' +
                     '<td>' + escapeHtml(c.name || '') + '</td>' +
                     '<td>' + escapeHtml(addr) + '</td>' +
                     '<td>' + escapeHtml(c.protocol || '') + '</td>' +
                     '<td>' + def + '</td>' +
                     '<td style="white-space:nowrap">' +
-                        '<button class="btn btn-sm btn-primary" onclick="openForm(\'' + c.id + '\')">编辑</button> ' +
-                        '<button class="btn btn-sm btn-outline" onclick="setDefault(\'' + c.id + '\')">设为默认</button> ' +
-                        '<button class="btn btn-sm btn-danger" onclick="removeConnection(\'' + c.id + '\')">删除</button>' +
+                        '<button class="btn btn-sm btn-primary" onclick="openForm(\'' + eid + '\')">编辑</button> ' +
+                        '<button class="btn btn-sm btn-outline" onclick="setDefault(\'' + eid + '\')">设为默认</button> ' +
+                        '<button class="btn btn-sm btn-danger" onclick="removeConnection(\'' + eid + '\')">删除</button>' +
                     '</td>' +
                 '</tr>';
             }).join('');
@@ -46,37 +53,44 @@ function openForm(id) {
     var title = document.getElementById('connModalTitle');
     if (id) {
         title.textContent = '编辑连接';
-        var conn = null;
-        // 先从已加载列表匹配
+        // 优先使用缓存，避免重复请求
+        var conn = _connCache.find(function (x) { return x.id === id; });
+        if (conn) {
+            _fillConnForm(conn);
+            modal.classList.add('active');
+            return;
+        }
+        // 缓存未命中（如页面刷新后直接编辑）：回退到 fetch
         fetch('/api/connections')
             .then(function (r) { return r.json(); })
             .then(function (list) {
-                conn = (list || []).find(function (x) { return x.id === id; });
+                _connCache = list || [];
+                conn = _connCache.find(function (x) { return x.id === id; });
                 if (!conn) return;
-                document.getElementById('connId').value = conn.id;
-                document.getElementById('connName').value = conn.name || '';
-                document.getElementById('connHost').value = conn.host || '';
-                document.getElementById('connPort').value = conn.port != null ? conn.port : '';
-                document.getElementById('connProtocol').value = conn.protocol || 'tcp';
-                document.getElementById('connToken').value = conn.token || '';
-                document.getElementById('connNote').value = conn.note || '';
+                _fillConnForm(conn);
                 modal.classList.add('active');
-            });
+            })
+            .catch(function () { showToast('加载连接信息失败', 'error'); });
         return;
     }
     title.textContent = '添加连接';
-    document.getElementById('connId').value = '';
-    document.getElementById('connName').value = '';
-    document.getElementById('connHost').value = '';
-    document.getElementById('connPort').value = '';
-    document.getElementById('connProtocol').value = 'tcp';
-    document.getElementById('connToken').value = '';
-    document.getElementById('connNote').value = '';
+    _fillConnForm(null);
     modal.classList.add('active');
 }
 
+// 填充表单：conn 为 null 时清空
+function _fillConnForm(conn) {
+    document.getElementById('connId').value = conn ? (conn.id || '') : '';
+    document.getElementById('connName').value = conn ? (conn.name || '') : '';
+    document.getElementById('connHost').value = conn ? (conn.host || '') : '';
+    document.getElementById('connPort').value = conn ? (conn.port != null ? conn.port : '') : '';
+    document.getElementById('connProtocol').value = conn ? (conn.protocol || 'tcp') : 'tcp';
+    document.getElementById('connToken').value = conn ? (conn.token || '') : '';
+    document.getElementById('connNote').value = conn ? (conn.note || '') : '';
+}
+
 function closeForm() {
-    document.getElementById('connModal').classList.remove('active');
+    closeModal('connModal');
 }
 
 function submitForm() {
@@ -91,21 +105,14 @@ function submitForm() {
     };
     var isEdit = !!payload.id;
     var url = isEdit ? '/api/connections/update' : '/api/connections/add';
-    if (isEdit) {
-        // 编辑时仅提交有变化的字段语义：保留 id，其余照旧提交
-        var body = {
-            id: payload.id,
-            name: payload.name,
-            host: payload.host,
-            port: payload.port,
-            protocol: payload.protocol,
-            token: payload.token,
-            note: payload.note,
-        };
-    } else {
-        var body = payload;
-    }
-    fetch(url, {
+    var body = isEdit ? {
+        id: payload.id, name: payload.name, host: payload.host, port: payload.port,
+        protocol: payload.protocol, token: payload.token, note: payload.note,
+    } : payload;
+    var saveBtn = document.querySelector('#connModal .btn-primary');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '保存中...'; }
+    var f = window.tdFetch || fetch;
+    f(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -120,8 +127,11 @@ function submitForm() {
                 showToast(d.error || '失败', 'error');
             }
         })
-        .catch(function () {
-            showToast('请求失败', 'error');
+        .catch(function (e) {
+            showToast((e && e.userMessage) || '请求失败', 'error');
+        })
+        .finally(function () {
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '保存'; }
         });
 }
 

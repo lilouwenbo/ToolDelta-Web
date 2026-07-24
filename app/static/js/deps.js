@@ -1,4 +1,5 @@
 // 依赖安装进度 UI：高斯模糊遮罩 + 安装方式选择 + 动画进度条 + 实时日志
+// 性能优化：复用全局 socket（避免重复 long-polling 连接）、按钮防双击、fetch 超时。
 (function () {
   var overlay = document.getElementById('depOverlay');
   if (!overlay) return;
@@ -12,6 +13,11 @@
   var run = document.getElementById('depRun');
   var title = document.getElementById('depTitle');
 
+  // 安装完成后是否已自动隐藏过，避免 socket 重复推送时再次弹遮罩
+  var _completed = false;
+  // 安装按钮防双击锁
+  var _installing = false;
+
   function showOverlay() { overlay.classList.add('active'); }
   function hideOverlay() { overlay.classList.remove('active'); }
   function showRun() { choose.style.display = 'none'; run.style.display = 'block'; }
@@ -22,7 +28,7 @@
   }
 
   function applyDep(d) {
-    if (!d) return;
+    if (!d || _completed) return;
     var p = Math.max(0, Math.min(100, d.progress || 0));
     bar.style.width = p + '%';
     percent.textContent = p + '%';
@@ -33,6 +39,7 @@
       log.scrollTop = log.scrollHeight;
     }
     if (d.ready) {
+      _completed = true;
       hideOverlay();
     } else {
       showOverlay();
@@ -49,6 +56,12 @@
 
   // 触发安装：mode = 'local' | 'online' | undefined（沿用上次 / 自动）
   window.triggerDepInstall = function (mode) {
+    // 防双击：安装进行中再次点击直接忽略
+    if (_installing) return;
+    _installing = true;
+    // 0.6s 后自动解锁，允许重试（失败场景）
+    setTimeout(function () { _installing = false; }, 600);
+
     showRun();
     showOverlay();
     actions.style.display = 'none';
@@ -59,19 +72,33 @@
       opts.headers = { 'Content-Type': 'application/json' };
       opts.body = JSON.stringify({ mode: mode });
     }
-    fetch('/api/dependencies/install', opts)
-      .then(function (r) { return r.json(); })
+    // 使用 tdFetch 统一超时与错误归类（若不可用则回退原生 fetch）
+    var f = (window.tdFetch || fetch)('/api/dependencies/install', opts, 30000);
+    f.then(function (r) { return r.json(); })
       .then(applyDep)
-      .catch(function () { stage.textContent = '触发安装失败，请刷新后重试'; });
+      .catch(function (e) {
+        var msg = (e && e.userMessage) ? e.userMessage : '触发安装失败，请刷新后重试';
+        stage.textContent = msg;
+      });
   };
 
-  // 实时进度（socket）
-  var depSocket = io({ transports: ['polling'] });
-  depSocket.on('dependency_progress', function (d) { applyDep(d); });
+  // 实时进度（socket）：延迟到 DOMContentLoaded 后注册，以便复用页面上已建立的 io 连接
+  // （console.js 在 base.html 的 {% block scripts %} 中加载，晚于 deps.js；
+  //  等 DOM 解析完成后 window.socket 已就绪，可复用同一 polling 连接，节省一条长轮询）
+  function _registerDepSocket() {
+    var s = (window.socket && window.socket.io) ? window.socket : io({ transports: ['polling'] });
+    s.on('dependency_progress', function (d) { applyDep(d); });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _registerDepSocket);
+  } else {
+    setTimeout(_registerDepSocket, 0);
+  }
 
   // 初始拉取状态，决定是否弹出遮罩 / 选择卡片
-  fetch('/api/dependencies')
-    .then(function (r) { return r.json(); })
+  // 使用 tdFetch 统一超时（若不可用则回退原生 fetch）
+  var f2 = (window.tdFetch || fetch)('/api/dependencies', null, 8000);
+  f2.then(function (r) { return r.json(); })
     .then(function (d) {
       if (d.ready) { hideOverlay(); return; }
       if (d.status === 'installing') {

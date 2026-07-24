@@ -20,10 +20,12 @@ function loadSources() {
             var sel = document.getElementById("logSource");
             if (!sel) return;
             var current = sel.value;
-            sel.innerHTML = '<option value="">全部来源</option>';
+            // 一次构建字符串再赋值，避免 innerHTML += 触发多次重解析
+            var html = '<option value="">全部来源</option>';
             (sources || []).forEach(function (s) {
-                sel.innerHTML += '<option value="' + s + '">' + s + "</option>";
+                html += '<option value="' + escapeHtml(s) + '">' + escapeHtml(s) + "</option>";
             });
+            sel.innerHTML = html;
             sel.value = current;
         })
         .catch(function (e) {
@@ -138,18 +140,20 @@ function loadDates() {
             var sel = document.getElementById("logDate");
             if (!sel) return;
             var current = sel.value;
-            sel.innerHTML = '<option value="today">今天</option>';
+            var html = '<option value="today">今天</option>';
             (files || []).forEach(function (f) {
-                var opt = '<option value="' + f.date + '">' + f.date + " (" +
+                html += '<option value="' + escapeHtml(f.date) + '">' + escapeHtml(f.date) + " (" +
                     (f.size / 1024).toFixed(1) + " KB)</option>";
-                sel.innerHTML += opt;
             });
+            sel.innerHTML = html;
             sel.value = current;
-        });
+        })
+        .catch(function () { /* 网络抖动忽略，下次刷新重试 */ });
 }
 
 // 初始化
 loadDates();
 loadSources();
 loadLogs();
-setInterval(loadLogs, 5000);
+if (window.TDPoll) { window.TDPoll.register(loadLogs, 5000); }
+else { setInterval(loadLogs, 5000); }

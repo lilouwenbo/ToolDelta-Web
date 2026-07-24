@@ -12,8 +12,8 @@
 </div>
 
 <div class="search-bar">
-    <input type="text" id="cmdSearch" placeholder="搜索命令或用途..." oninput="renderCommands()">
-    <input type="text" id="cmdPluginFilter" placeholder="按插件名筛选..." oninput="renderCommands()">
+    <input type="text" id="cmdSearch" placeholder="搜索命令或用途..." inputmode="search" enterkeyhint="search" oninput="renderCommands()" aria-label="搜索命令">
+    <input type="text" id="cmdPluginFilter" placeholder="按插件名筛选..." inputmode="search" enterkeyhint="search" oninput="renderCommands()" aria-label="按插件名筛选">
 </div>
 
 <div id="cmdList"></div>
@@ -24,15 +24,25 @@
 var allCommandData = [];
 var favSet = new Set();
 
+// 转义服务端数据，防止注入到 innerHTML
+function _cEsc(s) {
+    if (s === null || s === undefined) return '';
+    return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function loadCommands() {
     fetch('/api/commands/stats')
         .then(function(r) { return r.json(); })
         .then(function(d) {
             allCommandData = d.plugins || [];
-            document.getElementById('cmdStats').textContent = '共 ' + d.total_commands + ' 个命令，来自 ' + d.total_plugins + ' 个插件';
+            var st = document.getElementById('cmdStats');
+            if (st) st.textContent = '共 ' + d.total_commands + ' 个命令，来自 ' + d.total_plugins + ' 个插件';
             renderCommands();
             loadFavorites();
-        });
+        })
+        .catch(function() { showToast('加载命令失败', 'error'); });
 }
 
 function loadFavorites() {
@@ -46,7 +56,8 @@ function toggleFav(cmd) {
     var method = favSet.has(cmd) ? 'DELETE' : 'POST';
     fetch('/api/favorites', { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cmd: cmd }) })
         .then(function(r) { return r.json(); })
-        .then(function(d) { if (d.success) { favSet = new Set(d.commands || []); renderCommands(); } });
+        .then(function(d) { if (d.success) { favSet = new Set(d.commands || []); renderCommands(); } })
+        .catch(function() { showToast('收藏操作失败', 'error'); });
 }
 
 function renderCommands() {
@@ -68,26 +79,32 @@ function renderCommands() {
     }
 
     var container = document.getElementById('cmdList');
+    if (!container) return;
     if (data.length === 0) {
         container.innerHTML = '<div class="empty-state"><div class="icon" aria-hidden="true">⌨️</div>未找到命令<p class="empty-hint">尝试更换关键词或浏览其他分组</p></div>';
         return;
     }
 
     container.innerHTML = data.map(function(p, idx) {
+        var expanded = idx === 0;
         return '<div class="cmd-card">' +
-            '<div class="cmd-header" onclick="var n=this.nextElementSibling;n.style.display=n.style.display===\'none\'?\'block\':\'none\'">' +
-            '<span><strong>' + p.plugin + '</strong> <span class="badge badge-count">' + p.count + ' 个命令</span></span>' +
+            '<div class="cmd-header" tabindex="0" role="button" aria-expanded="' + (expanded ? 'true' : 'false') + '"' +
+            ' onclick="var n=this.nextElementSibling;var s=n.style.display!==\'none\';n.style.display=s?\'none\':\'block\';this.setAttribute(\'aria-expanded\',s?\'false\':\'true\')"' +
+            ' onkeydown="if(event.key===\'Enter\'||event.key===\' \'||event.keyCode===13||event.keyCode===32){event.preventDefault();this.click()}">' +
+            '<span><strong>' + _cEsc(p.plugin) + '</strong> <span class="badge badge-count">' + _cEsc(p.count) + ' 个命令</span></span>' +
             '<span style="font-size:12px;color:var(--ink-subtle)">' + (p.is_enabled ? '已启用' : '已禁用') + '</span>' +
             '</div>' +
-            '<div class="cmd-body" style="display:' + (idx === 0 ? 'block' : 'none') + '">' +
+            '<div class="cmd-body" style="display:' + (expanded ? 'block' : 'none') + '">' +
             p.commands.map(function(c) {
                 var key = c.triggers[0];
                 var favCls = favSet.has(key) ? ' fav-on' : '';
+                // JSON.stringify 已转义双引号，再用 _cEsc 处理单引号闭合风险
+                var keyAttr = _cEsc(JSON.stringify(key));
                 return '<div class="cmd-row">' +
-                    '<button class="fav-btn' + favCls + '" title="收藏此命令" onclick=\'toggleFav(' + JSON.stringify(key) + ')\'>★</button>' +
-                    '<span class="triggers">' + c.triggers.join('、') + '</span>' +
-                    '<span class="hint">' + (c.hint || '') + '</span>' +
-                    '<span class="usage">' + (c.usage || '') + '</span>' +
+                    '<button class="fav-btn' + favCls + '" title="收藏此命令" onclick=\'toggleFav(' + keyAttr + ')\'>★</button>' +
+                    '<span class="triggers">' + c.triggers.map(_cEsc).join('、') + '</span>' +
+                    '<span class="hint">' + _cEsc(c.hint || '') + '</span>' +
+                    '<span class="usage">' + _cEsc(c.usage || '') + '</span>' +
                     '</div>';
             }).join('') +
             '</div></div>';

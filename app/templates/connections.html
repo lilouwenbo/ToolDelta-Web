@@ -37,16 +37,16 @@
         <input type="hidden" id="connId">
         <div class="form-group">
             <label for="connName">名称</label>
-            <input type="text" id="connName" class="form-control" placeholder="例如：本地服务器">
+            <input type="text" id="connName" class="form-control" placeholder="例如：本地服务器" inputmode="text" enterkeyhint="next" name="conn-name" autocomplete="off">
         </div>
         <div class="form-row">
             <div class="form-group">
                 <label for="connHost">地址 (host)</label>
-                <input type="text" id="connHost" class="form-control" placeholder="例如：127.0.0.1">
+                <input type="text" id="connHost" class="form-control" placeholder="例如：127.0.0.1" inputmode="text" enterkeyhint="next" name="conn-host" autocomplete="off">
             </div>
             <div class="form-group form-group--narrow">
                 <label for="connPort">端口 (port)</label>
-                <input type="number" id="connPort" class="form-control" placeholder="8080">
+                <input type="number" id="connPort" class="form-control" placeholder="8080" inputmode="numeric" enterkeyhint="next" name="conn-port" autocomplete="off">
             </div>
         </div>
         <div class="form-group">
@@ -58,11 +58,11 @@
         </div>
         <div class="form-group">
             <label for="connToken">Token（可选）</label>
-            <input type="text" id="connToken" class="form-control" placeholder="可选">
+            <input type="text" id="connToken" class="form-control" placeholder="可选" inputmode="text" enterkeyhint="next" autocomplete="off">
         </div>
         <div class="form-group">
             <label for="connNote">备注（可选）</label>
-            <textarea id="connNote" class="form-control" rows="2" placeholder="可选"></textarea>
+            <textarea id="connNote" class="form-control" rows="2" placeholder="可选" enterkeyhint="done"></textarea>
         </div>
         <div class="modal-actions">
             <button class="btn btn-outline" onclick="closeForm()">取消</button>

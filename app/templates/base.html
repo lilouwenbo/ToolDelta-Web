@@ -14,31 +14,109 @@
     <script>
       (function(){ if (localStorage.getItem('td_theme') === 'light') document.body.classList.add('theme-light'); })();
       function toggleTheme(){ var light = document.body.classList.toggle('theme-light'); localStorage.setItem('td_theme', light ? 'light' : 'dark'); var b=document.querySelector('.theme-toggle'); if(b){ b.setAttribute('aria-pressed', light ? 'true' : 'false'); } }
-      function toggleSidebar(){ document.body.classList.toggle('sidebar-open'); var b=document.querySelector('.sidebar-toggle-btn'); if(b){ b.setAttribute('aria-expanded', document.body.classList.contains('sidebar-open') ? 'true' : 'false'); } }
+      function toggleSidebar(){
+          var open = document.body.classList.toggle('sidebar-open');
+          var b=document.querySelector('.sidebar-toggle-btn');
+          if(b){ b.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+          // 抽屉打开时背景主内容对屏幕阅读器隐藏（移动端）
+          var main = document.getElementById('mainContent');
+          if (main && window.matchMedia && window.matchMedia('(max-width: 900px)').matches) {
+              main.setAttribute('aria-hidden', open ? 'true' : 'false');
+          }
+      }
+
+      /* ── Android 软键盘适配：visualViewport 监听 ──
+         安卓 Chrome 键盘弹起时不会自动滚动聚焦元素，且 layout viewport 不变。
+         通过 visualViewport 监听键盘高度，对吸底元素（console-foot / modal-actions）
+         施加 translateY 上移，避免被键盘遮挡。 */
+      (function(){
+        if (!window.visualViewport) return;
+        var vv = window.visualViewport;
+        function onResize(){
+          // 标记键盘是否弹起：可用视口高度明显小于 layout 高度
+          var kbOpen = (window.innerHeight - vv.height) > 80;
+          document.body.classList.toggle('kbd-open', kbOpen);
+          // 触发聚焦元素滚动到可见区
+          var ae = document.activeElement;
+          if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA') && ae.getBoundingClientRect) {
+            var r = ae.getBoundingClientRect();
+            // 元素底部若超出可视视口则滚动
+            if (r.bottom > vv.height + vv.offsetTop) {
+              ae.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+          }
+        }
+        vv.addEventListener('resize', onResize);
+        vv.addEventListener('scroll', onResize);
+      })();
     </script>
     {% if wallpaper_url %}<div class="wallpaper-bg" style="background-image:url('{{ wallpaper_url }}')"></div>{% endif %}
     <script src="/static/js/wallpaper.js"></script>
     <button class="sidebar-toggle-btn" onclick="toggleSidebar()" title="菜单" aria-label="切换菜单" aria-expanded="false">☰</button>
     <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()" role="button" tabindex="0" aria-label="关闭菜单"></div>
+    <script>
+      /* ── Android 侧边栏边缘滑动手势 ──
+         左边缘右滑打开、左滑关闭抽屉；阈值 60px，避免误触。 */
+      (function(){
+        var edgeStartX = null, edgeStartY = null, tracking = false;
+        var EDGE = 28; // 左边缘检测宽度（px）
+        document.addEventListener('touchstart', function(e){
+          if (window.innerWidth > 900) return; // 仅移动端
+          var t = e.touches[0];
+          // 从左边缘开始才追踪（用于打开）
+          if (t.clientX < EDGE) { edgeStartX = t.clientX; edgeStartY = t.clientY; tracking = 'open'; }
+          // 抽屉打开时，从抽屉区域或右侧开始追踪（用于关闭）
+          else if (document.body.classList.contains('sidebar-open')) {
+            edgeStartX = t.clientX; edgeStartY = t.clientY; tracking = 'close';
+          }
+        }, { passive: true });
+        document.addEventListener('touchend', function(e){
+          if (!tracking || edgeStartX === null) { tracking = false; return; }
+          var t = e.changedTouches[0];
+          var dx = t.clientX - edgeStartX;
+          var dy = Math.abs(t.clientY - edgeStartY);
+          // 横向位移 > 60 且纵向上 < 80 才算有效滑动
+          if (dy < 80 && Math.abs(dx) > 60) {
+            if (tracking === 'open' && dx > 0 && !document.body.classList.contains('sidebar-open')) {
+              toggleSidebar();
+            } else if (tracking === 'close' && dx < 0 && document.body.classList.contains('sidebar-open')) {
+              toggleSidebar();
+            }
+          }
+          edgeStartX = edgeStartY = null; tracking = false;
+        }, { passive: true });
+      })();
+      /* ── backdrop 键盘触发：Enter/Space 关闭 ── */
+      (function(){
+        var bd = document.getElementById('sidebarBackdrop');
+        if (!bd) return;
+        bd.addEventListener('keydown', function(e){
+          if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32) {
+            e.preventDefault();
+            toggleSidebar();
+          }
+        });
+      })();
+    </script>
     <aside class="sidebar" id="sidebar">
         <div class="brand">
             <span class="logo">TD</span>
             <span class="brand-name">ToolDelta</span>
-            <span class="status-dot" id="sidebarStatus"></span>
+            <span class="status-dot" id="sidebarStatus" role="status" aria-label="连接状态未知"></span>
         </div>
-        <nav>
-            <a href="/" class="{% if active_page == 'index' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">📊</span>仪表盘</a>
-            <a href="/console" class="{% if active_page == 'console' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">🖥️</span>控制台</a>
-            <a href="/plugins" class="{% if active_page == 'plugins' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">🧩</span>插件管理</a>
-            <a href="/market" class="{% if active_page == 'market' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">🛒</span>插件市场</a>
-            <a href="/files" class="{% if active_page == 'files' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">📁</span>文件管理</a>
-            <a href="/commands" class="{% if active_page == 'commands' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">⌨️</span>命令参考</a>
-            <a href="/backup" class="{% if active_page == 'backup' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">💾</span>备份恢复</a>
-            <a href="/logs" class="{% if active_page == 'logs' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">📜</span>日志</a>
-            <a href="/connections" class="{% if active_page == 'connections' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">🌐</span>服务器连接</a>
-            <a href="/watchdog" class="{% if active_page == 'watchdog' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">🐕</span>看门狗</a>
-            <a href="/scheduler" class="{% if active_page == 'scheduler' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">⏰</span>定时任务</a>
-            <a href="/settings" class="nav-separator {% if active_page == 'settings' %}active{% endif %}"><span class="nav-ico" aria-hidden="true">🎛️</span>面板设置</a>
+        <nav aria-label="主导航">
+            <a href="/" class="{% if active_page == 'index' %}active{% endif %}" {% if active_page == 'index' %}aria-current="page"{% endif %}><span class="nav-ico" aria-hidden="true">📊</span>仪表盘</a>
+            <a href="/console" class="{% if active_page == 'console' %}active{% endif %}" {% if active_page == 'console' %}aria-current="page"{% endif %}><span class="nav-ico" aria-hidden="true">🖥️</span>控制台</a>
+            <a href="/plugins" class="{% if active_page == 'plugins' %}active{% endif %}" {% if active_page == 'plugins' %}aria-current="page"{% endif %}><span class="nav-ico" aria-hidden="true">🧩</span>插件管理</a>
+            <a href="/market" class="{% if active_page == 'market' %}active{% endif %}" {% if active_page == 'market' %}aria-current="page"{% endif %}><span class="nav-ico" aria-hidden="true">🛒</span>插件市场</a>
+            <a href="/files" class="{% if active_page == 'files' %}active{% endif %}" {% if active_page == 'files' %}aria-current="page"{% endif %}><span class="nav-ico" aria-hidden="true">📁</span>文件管理</a>
+            <a href="/commands" class="{% if active_page == 'commands' %}active{% endif %}" {% if active_page == 'commands' %}aria-current="page"{% endif %}><span class="nav-ico" aria-hidden="true">⌨️</span>命令参考</a>
+            <a href="/backup" class="{% if active_page == 'backup' %}active{% endif %}" {% if active_page == 'backup' %}aria-current="page"{% endif %}><span class="nav-ico" aria-hidden="true">💾</span>备份恢复</a>
+            <a href="/logs" class="{% if active_page == 'logs' %}active{% endif %}" {% if active_page == 'logs' %}aria-current="page"{% endif %}><span class="nav-ico" aria-hidden="true">📜</span>日志</a>
+            <a href="/connections" class="{% if active_page == 'connections' %}active{% endif %}" {% if active_page == 'connections' %}aria-current="page"{% endif %}><span class="nav-ico" aria-hidden="true">🌐</span>服务器连接</a>
+            <a href="/watchdog" class="{% if active_page == 'watchdog' %}active{% endif %}" {% if active_page == 'watchdog' %}aria-current="page"{% endif %}><span class="nav-ico" aria-hidden="true">🐕</span>看门狗</a>
+            <a href="/scheduler" class="{% if active_page == 'scheduler' %}active{% endif %}" {% if active_page == 'scheduler' %}aria-current="page"{% endif %}><span class="nav-ico" aria-hidden="true">⏰</span>定时任务</a>
+            <a href="/settings" class="nav-separator {% if active_page == 'settings' %}active{% endif %}" {% if active_page == 'settings' %}aria-current="page"{% endif %}><span class="nav-ico" aria-hidden="true">🎛️</span>面板设置</a>
         </nav>
         <div class="sidebar-footer">
             <button class="theme-toggle" onclick="toggleTheme()" title="切换深色 / 浅色主题" aria-pressed="false">🌗 主题</button>
@@ -49,11 +127,11 @@
         </div>
     </aside>
 
-    <main class="main-content">
+    <main class="main-content" id="mainContent" aria-label="主要内容">
         {% block content %}{% endblock %}
     </main>
 
-    <div class="toast-container" id="toastContainer"></div>
+    <div class="toast-container" id="toastContainer" role="region" aria-live="polite" aria-label="通知"></div>
 
     <!-- 依赖安装遮罩层：高斯模糊背景 + 安装方式选择 + 动画进度条 + 实时日志 -->
     <div class="dep-overlay" id="depOverlay" role="dialog" aria-modal="true" aria-labelledby="depTitle">

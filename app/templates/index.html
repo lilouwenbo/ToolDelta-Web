@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-header">
     <h1>仪表盘</h1>
-    <button class="btn" id="mainToggleBtn" onclick="toggleTool()">启动中...</button>
+    <button class="btn" id="mainToggleBtn" onclick="toggleTool()" aria-busy="true">检测中...</button>
 </div>
 
 <div class="stat-grid">
@@ -12,28 +12,28 @@
             <div class="stat-icon" id="statusIcon">●</div>
             <div class="stat-label">运行状态</div>
         </div>
-        <div class="stat-value" id="statusText">检测中...</div>
+        <div class="stat-value loading-text" id="statusText">检测中...</div>
     </div>
     <div class="stat-card">
         <div class="stat-header">
             <div class="stat-icon">🧩</div>
             <div class="stat-label">插件数量</div>
         </div>
-        <div class="stat-value" id="pluginCount">-</div>
+        <div class="stat-value loading-text" id="pluginCount">—</div>
     </div>
     <div class="stat-card">
         <div class="stat-header">
             <div class="stat-icon">🛒</div>
             <div class="stat-label">市场插件数</div>
         </div>
-        <div class="stat-value" id="marketCount">-</div>
+        <div class="stat-value loading-text" id="marketCount">—</div>
     </div>
     <div class="stat-card">
         <div class="stat-header">
             <div class="stat-icon">💾</div>
             <div class="stat-label">备份数量</div>
         </div>
-        <div class="stat-value" id="backupCount">-</div>
+        <div class="stat-value loading-text" id="backupCount">—</div>
     </div>
 </div>
 
@@ -90,23 +90,23 @@
 </div>
 
 <div class="card">
-    <h3>快捷操作</h3>
+    <h2>快捷操作</h2>
     <div class="quick-actions">
-        <button class="btn btn-primary" onclick="location.href='/console'">打开控制台</button>
-        <button class="btn btn-outline" onclick="location.href='/plugins'">插件管理</button>
-        <button class="btn btn-outline" onclick="location.href='/market'">浏览市场</button>
-        <button class="btn btn-outline" onclick="location.href='/backup'">备份</button>
-        <button class="btn btn-outline" onclick="location.href='/commands'">命令参考</button>
+        <a class="btn btn-primary" href="/console">打开控制台</a>
+        <a class="btn btn-outline" href="/plugins">插件管理</a>
+        <a class="btn btn-outline" href="/market">浏览市场</a>
+        <a class="btn btn-outline" href="/backup">备份</a>
+        <a class="btn btn-outline" href="/commands">命令参考</a>
     </div>
 </div>
 
 <div class="card">
-    <h3>系统信息</h3>
+    <h2>系统信息</h2>
     <table>
         <tbody id="sysInfoTable">
-            <tr><td style="width:160px">Python 版本</td><td id="infoPython">-</td></tr>
+            <tr><td style="width:120px">Python 版本</td><td id="infoPython">-</td></tr>
             <tr><td>操作系统</td><td id="infoPlatform">-</td></tr>
-            <tr><td>ToolDelta 目录</td><td id="infoDir">-</td></tr>
+            <tr><td>ToolDelta 目录</td><td id="infoDir" style="word-break:break-all;font-family:monospace;font-size:12px">-</td></tr>
             <tr><td>ToolDelta 状态</td><td id="infoExists">-</td></tr>
         </tbody>
     </table>
@@ -143,9 +143,10 @@ async function loadDashboard() {
     } catch(e) { console.error(e); }
 }
 loadDashboard();
-setInterval(loadDashboard, 5000);
+// 统一使用 TDPoll：页面隐藏时暂停，避免移动端后台耗电
+if (window.TDPoll) { window.TDPoll.register(loadDashboard, 5000); }
+else { setInterval(loadDashboard, 5000); }
 </script>
 
 <script src="/static/js/dashboard.js"></script>
-<script>loadDashboardStats();</script>
 {% endblock %}

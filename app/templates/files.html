@@ -20,7 +20,7 @@
             <span style="margin-left:auto;color:var(--ink-subtle);font-size:12px" id="fileCount"></span>
         </div>
         <div class="form-row" style="margin:0">
-            <input type="text" id="searchInput" class="form-control" placeholder="搜索文件..." aria-label="搜索文件" onkeydown="if(event.key==='Enter')doSearch()">
+            <input type="text" id="searchInput" class="form-control" placeholder="搜索文件..." inputmode="search" enterkeyhint="search" aria-label="搜索文件" onkeydown="if(event.key==='Enter')doSearch()">
             <button class="btn btn-sm btn-outline" onclick="doSearch()">搜索</button>
             <button class="btn btn-sm btn-outline" onclick="clearSearch()" id="clearSearchBtn" style="display:none">清除</button>
         </div>
@@ -33,9 +33,9 @@
                 <thead>
                     <tr>
                         <th style="width:32px"><input type="checkbox" id="selectAll" aria-label="全选" onchange="toggleSelectAll(this.checked)"></th>
-                        <th style="cursor:pointer" onclick="setSort('name')">名称 <span id="sortName" class="loading-text" style="font-size:11px" aria-hidden="true"></span></th>
-                        <th style="width:100px;cursor:pointer" onclick="setSort('size')">大小 <span id="sortSize" class="loading-text" style="font-size:11px" aria-hidden="true"></span></th>
-                        <th style="width:160px;cursor:pointer" onclick="setSort('mtime')">修改时间 <span id="sortMtime" class="loading-text" style="font-size:11px" aria-hidden="true"></span></th>
+                        <th style="cursor:pointer" tabindex="0" role="button" aria-label="按名称排序" onclick="setSort('name')" onkeydown="if(event.key==='Enter'||event.key===' '||event.keyCode===13||event.keyCode===32){event.preventDefault();setSort('name')}">名称 <span id="sortName" class="loading-text" style="font-size:11px" aria-hidden="true"></span></th>
+                        <th style="width:100px;cursor:pointer" tabindex="0" role="button" aria-label="按大小排序" onclick="setSort('size')" onkeydown="if(event.key==='Enter'||event.key===' '||event.keyCode===13||event.keyCode===32){event.preventDefault();setSort('size')}">大小 <span id="sortSize" class="loading-text" style="font-size:11px" aria-hidden="true"></span></th>
+                        <th style="width:160px;cursor:pointer" tabindex="0" role="button" aria-label="按修改时间排序" onclick="setSort('mtime')" onkeydown="if(event.key==='Enter'||event.key===' '||event.keyCode===13||event.keyCode===32){event.preventDefault();setSort('mtime')}">修改时间 <span id="sortMtime" class="loading-text" style="font-size:11px" aria-hidden="true"></span></th>
                         <th style="width:180px">操作</th>
                     </tr>
                 </thead>
@@ -45,7 +45,16 @@
         <div id="emptyState" class="empty-state" style="display:none">
             <div class="icon" id="emptyIcon" aria-hidden="true">📁</div>
             <p id="emptyText">此目录为空</p>
-            <button class="btn btn-sm btn-outline" onclick="document.getElementById('uploadInput').click()">上传第一个文件</button>
+            <button class="btn btn-sm btn-outline" id="emptyCta" onclick="document.getElementById('uploadInput').click()">上传第一个文件</button>
+        </div>
+        <div id="errorState" class="empty-state" style="display:none">
+            <div class="icon" aria-hidden="true">⚠️</div>
+            <p id="errorText">加载失败</p>
+            <button class="btn btn-sm btn-outline" onclick="loadFiles()">重试</button>
+        </div>
+        <div id="loadingState" class="empty-state" style="display:none" aria-busy="true" aria-live="polite">
+            <div class="spinner" style="margin:0 auto 12px"></div>
+            <p style="color:var(--ink-subtle)">加载中…</p>
         </div>
     </div>
 </div>
@@ -66,6 +75,17 @@
   background:var(--surface-1); cursor:pointer; color:var(--ink);
 }
 .up-btn:hover { background: var(--surface-3); }
+
+/* 移动端文件管理适配：紧凑操作列 + 文件名限宽 */
+@media (max-width: 768px) {
+  /* 文件名最大宽度收紧，给操作列腾空间 */
+  td[style*="max-width:400px"] { max-width: 45vw !important; }
+  /* 操作列按钮：缩短文字、收紧间距，触控目标符合 36px 最小 */
+  #fileList .btn-sm { min-height: 34px; padding: 5px 8px; font-size: 11px; margin-right: 2px !important; }
+  /* 隐藏大小/时间列（信息密度让位触控），保留名称+操作 */
+  .table th:nth-child(3), .table td:nth-child(3),
+  .table th:nth-child(4), .table td:nth-child(4) { display: none; }
+}
 </style>
 
 <div class="modal-overlay" id="editorModal" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
@@ -110,16 +130,34 @@ function navigateTo(path) {
     loadFiles();
 }
 
+function _showFileState(state, opts) {
+    var loading = document.getElementById('loadingState');
+    var error = document.getElementById('errorState');
+    var empty = document.getElementById('emptyState');
+    var tbody = document.getElementById('fileList');
+    var wrap = tbody ? tbody.closest('.table-wrap') : null;
+    if (loading) loading.style.display = state === 'loading' ? 'block' : 'none';
+    if (error) error.style.display = state === 'error' ? 'block' : 'none';
+    if (empty) empty.style.display = state === 'empty' ? 'block' : 'none';
+    // 表格区在加载/错误/空态时隐藏，仅列表态显示
+    if (wrap) wrap.style.display = state === 'list' ? '' : 'none';
+    if (state === 'error' && opts && opts.msg) {
+        var et = document.getElementById('errorText');
+        if (et) et.textContent = opts.msg;
+    }
+}
+
 function loadFiles() {
     var url = IS_SEARCH
         ? '/api/files/search?q=' + encodeURIComponent(document.getElementById('searchInput').value) + '&path=' + encodeURIComponent(CURRENT_PATH)
         : '/api/files/list?path=' + encodeURIComponent(CURRENT_PATH);
+    _showFileState('loading');
     fetch(url).then(function(r){return r.json()}).then(function(d){
-        if (!d.success) { showToast(d.error||'加载失败', 'error'); return; }
+        if (!d.success) { showToast(d.error||'加载失败', 'error'); _showFileState('error', {msg: d.error || '加载失败'}); return; }
         FILES_ROOT = d.data.root;
         renderBreadcrumbs(d.data.current);
         renderFiles(sortEntries(d.data.entries));
-    }).catch(function(){ showToast('请求失败', 'error'); });
+    }).catch(function(){ showToast('请求失败', 'error'); _showFileState('error', {msg: '网络请求失败'}); });
 }
 
 function sortEntries(entries) {
@@ -175,25 +213,31 @@ function renderBreadcrumbs(current) {
 
 function renderFiles(entries) {
     var tbody = document.getElementById('fileList');
-    var empty = document.getElementById('emptyState');
     var emptyIcon = document.getElementById('emptyIcon');
     var emptyText = document.getElementById('emptyText');
+    var emptyCta = document.getElementById('emptyCta');
     tbody.innerHTML = '';
     SELECTED = [];
     document.getElementById('selectAll').checked = false;
     updateBatchBtn();
     if (entries.length === 0) {
-        empty.style.display = 'block';
-        if (IS_SEARCH) { emptyIcon.textContent = '🔍'; emptyText.textContent = '未找到匹配的文件'; }
-        else { emptyIcon.textContent = '📁'; emptyText.textContent = '此目录为空'; }
+        _showFileState('empty');
+        if (IS_SEARCH) {
+            emptyIcon.textContent = '🔍'; emptyText.textContent = '未找到匹配的文件';
+            if (emptyCta) emptyCta.style.display = 'none'; // 搜索空态不显示上传 CTA
+        } else {
+            emptyIcon.textContent = '📁'; emptyText.textContent = '此目录为空';
+            if (emptyCta) emptyCta.style.display = ''; // 目录空态显示上传 CTA
+        }
         document.getElementById('fileCount').textContent = '0 项';
         return;
     }
-    empty.style.display = 'none';
+    _showFileState('list');
     document.getElementById('fileCount').textContent = entries.length + ' 项';
     entries.forEach(function(e) {
         var tr = document.createElement('tr');
         tr.style.cursor = e.is_dir ? 'pointer' : 'default';
+        tr._path = e.path; // 供 toggleSelectAll 收集路径使用
         var icon = e.is_dir ? '📁' : getFileIcon(e.ext);
         var sizeStr = e.is_dir ? '-' : formatSize(e.size);
         var timeStr = formatTime(e.mtime);
@@ -208,6 +252,12 @@ function renderFiles(entries) {
         td.style.whiteSpace = 'nowrap';
         if (e.is_dir) {
             tr.addEventListener('dblclick', function(){ navigateTo(e.path); });
+            // 移动端无双击：单触点击目录行也打开
+            tr.addEventListener('click', function(ev){
+                // 排除点击按钮/复选框时触发
+                if (ev.target.closest('button') || ev.target.type === 'checkbox') return;
+                if (window.matchMedia('(pointer: coarse)').matches) navigateTo(e.path);
+            });
             var openBtn = document.createElement('button');
             openBtn.className = 'btn btn-sm btn-outline';
             openBtn.textContent = '打开';
@@ -292,7 +342,8 @@ function batchDelete() {
             if (d.data && d.data.deleted && d.data.deleted.length > 0) showToast('已删除 ' + d.data.deleted.length + ' 项', 'success');
             if (d.data && d.data.errors && d.data.errors.length > 0) showToast('失败: ' + d.data.errors[0], 'error');
             loadFiles();
-        });
+        })
+        .catch(function(){ showToast('批量删除请求失败', 'error'); });
     });
 }
 
@@ -354,7 +405,8 @@ function deleteItem(path, isDir) {
         .then(function(d){
             if(d.success){ showToast('已删除', 'success'); loadFiles(); }
             else { showToast(d.error||'删除失败', 'error'); }
-        });
+        })
+        .catch(function(){ showToast('删除请求失败', 'error'); });
     });
 }
 
@@ -384,7 +436,7 @@ function showMoveCopy(path, isDir) {
     document.getElementById('moveCopyPath').value = '';
     document.getElementById('moveCopyConfirmBtn').textContent = '移动';
     MOVE_COPY_MODE = 'move';
-    document.getElementById('moveCopyModal').classList.add('active');
+    _openModal('moveCopyModal');
 }
 
 function confirmMoveCopy() {
@@ -392,16 +444,20 @@ function confirmMoveCopy() {
     if (!dest) { showToast('请输入目标路径', 'error'); return; }
     var isCopy = MOVE_COPY_MODE === 'copy';
     var url = isCopy ? '/api/files/copy' : '/api/files/move';
+    var btn = document.getElementById('moveCopyConfirmBtn');
+    if (btn) { btn.disabled = true; }
     fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:MOVE_COPY_PATH, destination:dest}) })
     .then(function(r){return r.json()})
     .then(function(d){
         if(d.success){ showToast(isCopy?'已复制':'已移动', 'success'); closeMoveCopy(); loadFiles(); }
         else { showToast(d.error||'操作失败', 'error'); }
-    });
+    })
+    .catch(function(){ showToast('操作请求失败', 'error'); })
+    .then(function(){ if (btn) { btn.disabled = false; } });
 }
 
 function closeMoveCopy() {
-    document.getElementById('moveCopyModal').classList.remove('active');
+    _closeModal('moveCopyModal');
 }
 
 function showNewFolder() {
@@ -440,27 +496,32 @@ function openEditor(path) {
     EDITOR_PATH = path;
     document.getElementById('editorTitle').textContent = '编辑: ' + path.split('/').pop().split('\\').pop();
     document.getElementById('editorContent').value = '加载中...';
-    document.getElementById('editorModal').classList.add('active');
+    _openModal('editorModal');
     fetch('/api/files/read?path='+encodeURIComponent(path))
     .then(function(r){return r.json()})
     .then(function(d){
         if(d.success){ document.getElementById('editorContent').value = d.data.content; }
         else { showToast(d.error||'加载失败', 'error'); document.getElementById('editorContent').value = ''; }
-    });
+    })
+    .catch(function(){ showToast('加载文件请求失败', 'error'); });
 }
 
 function saveEditor() {
     var content = document.getElementById('editorContent').value;
+    var btn = document.querySelector('#editorModal .btn-primary');
+    if (btn) { btn.disabled = true; }
     fetch('/api/files/save', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:EDITOR_PATH, content:content}) })
     .then(function(r){return r.json()})
     .then(function(d){
         if(d.success){ showToast('已保存', 'success'); closeEditor(); loadFiles(); }
         else { showToast(d.error||'保存失败', 'error'); }
-    });
+    })
+    .catch(function(){ showToast('保存请求失败', 'error'); })
+    .then(function(){ if (btn) { btn.disabled = false; } });
 }
 
 function closeEditor() {
-    document.getElementById('editorModal').classList.remove('active');
+    _closeModal('editorModal');
     EDITOR_PATH = '';
 }
 

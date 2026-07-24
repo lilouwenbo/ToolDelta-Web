@@ -6,7 +6,8 @@ function escapeHtml(s) {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function typeText(job) {
@@ -33,20 +34,22 @@ function loadJobs() {
             var html = '';
             jobs.forEach(function (job) {
                 var enabled = !!job.enabled;
+                // 转义 job.id 防止 onclick 属性上下文注入（单引号闭合）
+                var eid = escapeHtml(job.id);
                 html += '<tr>';
                 html += '<td>' + escapeHtml(job.name) + '</td>';
                 html += '<td>' + escapeHtml(typeText(job)) + '</td>';
                 html += '<td><code style="font-size:12px">' + escapeHtml(job.command) + '</code></td>';
                 html += '<td><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">'
                     + '<input type="checkbox" ' + (enabled ? 'checked' : '') + ' style="accent-color:var(--primary)" '
-                    + 'onchange="toggleEnabled(\'' + job.id + '\', this.checked)"> '
+                    + 'onchange="toggleEnabled(\'' + eid + '\', this.checked)"> '
                     + (enabled ? '已启用' : '已关闭') + '</label></td>';
-                html += '<td>' + (job.run_count || 0) + '</td>';
-                html += '<td style="font-size:12px;color:var(--ink-subtle)">' + (job.last_run || '—') + '</td>';
+                html += '<td>' + escapeHtml(job.run_count || 0) + '</td>';
+                html += '<td style="font-size:12px;color:var(--ink-subtle)">' + escapeHtml(job.last_run || '—') + '</td>';
                 html += '<td><div style="display:flex;gap:6px;flex-wrap:wrap">'
-                    + '<button class="btn btn-outline btn-sm" onclick="openEdit(\'' + job.id + '\')">编辑</button>'
-                    + '<button class="btn btn-outline btn-sm" onclick="runNow(\'' + job.id + '\')">立即运行</button>'
-                    + '<button class="btn btn-danger btn-sm" onclick="removeJob(\'' + job.id + '\')">删除</button>'
+                    + '<button class="btn btn-outline btn-sm" onclick="openEdit(\'' + eid + '\')">编辑</button>'
+                    + '<button class="btn btn-outline btn-sm" onclick="runNow(\'' + eid + '\')">立即运行</button>'
+                    + '<button class="btn btn-danger btn-sm" onclick="removeJob(\'' + eid + '\')">删除</button>'
                     + '</div></td>';
                 html += '</tr>';
             });
@@ -147,7 +150,7 @@ function openEdit(id) {
 }
 
 function closeJobModal() {
-    document.getElementById('jobModal').classList.remove('active');
+    closeModal('jobModal');
 }
 
 function submitJob() {
@@ -159,11 +162,13 @@ function submitJob() {
         command: document.getElementById('job_command').value,
         enabled: document.getElementById('job_enabled').checked
     };
+    // parseInt 失败时回退为 0，避免向服务端发送 NaN
+    var safeInt = function (id) { var v = parseInt(document.getElementById(id).value, 10); return isNaN(v) ? 0 : v; };
     if (type === 'interval') {
-        payload.interval = parseInt(document.getElementById('job_interval').value, 10);
+        payload.interval = safeInt('job_interval');
     } else {
-        payload.hour = parseInt(document.getElementById('job_hour').value, 10);
-        payload.minute = parseInt(document.getElementById('job_minute').value, 10);
+        payload.hour = safeInt('job_hour');
+        payload.minute = safeInt('job_minute');
     }
 
     var isEdit = !!payload.id;
@@ -188,7 +193,9 @@ function submitJob() {
 }
 
 // 类型切换实时更新表单字段显隐
-document.getElementById('job_type').addEventListener('change', syncTypeFields);
+var _typeEl = document.getElementById('job_type');
+if (_typeEl) _typeEl.addEventListener('change', syncTypeFields);
 
 loadJobs();
-setInterval(loadJobs, 5000);
+if (window.TDPoll) { window.TDPoll.register(loadJobs, 5000); }
+else { setInterval(loadJobs, 5000); }

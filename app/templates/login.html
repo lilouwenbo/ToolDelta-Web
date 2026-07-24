@@ -66,8 +66,8 @@
             <label for="password">密码</label>
             <div class="input-wrap">
                 <span class="input-ico">🔒</span>
-                <input type="password" id="password" placeholder="输入密码" autocomplete="current-password">
-                <span class="pw-toggle" onclick="var i=document.getElementById('password');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'">👁</span>
+                <input type="password" id="password" placeholder="输入密码" autocomplete="current-password" enterkeyhint="go" name="password">
+                <span class="pw-toggle" role="button" tabindex="0" aria-label="显示或隐藏密码" onclick="var i=document.getElementById('password');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'" onkeydown="if(event.key==='Enter'||event.key===' '||event.keyCode===13||event.keyCode===32){event.preventDefault();this.click();}">👁</span>
             </div>
         </div>
         <button class="btn btn-primary" id="loginBtn" onclick="doLogin()">登录</button>

@@ -12,7 +12,7 @@
             <button class="btn btn-outline" onclick="clearWallpaper()">清除壁纸</button>
         </div>
         <div class="form-row" style="margin-top:10px">
-            <input type="text" id="manualWallpaperUrl" class="form-control" placeholder="或输入图片URL...">
+            <input type="text" id="manualWallpaperUrl" class="form-control" placeholder="或输入图片URL..." inputmode="url" enterkeyhint="done" name="wallpaper_url" autocomplete="off">
             <button class="btn btn-sm btn-outline" onclick="setManualWallpaper()">应用</button>
         </div>
         <div id="wallpaperError" class="form-hint" style="color:var(--danger);display:none;margin-top:6px"></div>
@@ -31,17 +31,17 @@
         <h2 class="card-title">修改密码</h2>
         <div class="form-group">
             <label class="form-label" for="oldPw">当前密码</label>
-            <input type="password" id="oldPw" class="form-control">
+            <input type="password" id="oldPw" name="old-password" class="form-control" autocomplete="current-password" enterkeyhint="next">
         </div>
         <div class="form-group">
             <label class="form-label" for="newPw">新密码</label>
-            <input type="password" id="newPw" class="form-control" oninput="renderSettingsPwStrength(this.value)">
+            <input type="password" id="newPw" name="new-password" class="form-control" autocomplete="new-password" enterkeyhint="next" oninput="renderSettingsPwStrength(this.value)">
             <span class="form-hint">密码长度1-64位，建议8位以上并包含字母、数字、特殊字符；弱密码仅提示不阻止修改。</span>
             <div id="settingsPwBox" class="pw-strength-box" style="display:none;margin-top:8px"></div>
         </div>
         <div class="form-group">
             <label class="form-label" for="newPw2">确认新密码</label>
-            <input type="password" id="newPw2" class="form-control">
+            <input type="password" id="newPw2" name="new-password-confirm" class="form-control" autocomplete="new-password" enterkeyhint="done">
         </div>
         <button class="btn btn-primary" onclick="changePassword()">修改密码</button>
     </div>
@@ -102,7 +102,7 @@
             </div>
             <div style="margin-bottom:10px">
                 <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:var(--ink-muted)">密码</label>
-                <input type="password" id="cfg_fate_password" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:13px;outline:none;box-sizing:border-box">
+                <input type="password" id="cfg_fate_password" autocomplete="current-password" enterkeyhint="done" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--canvas);color:var(--ink);font-size:13px;outline:none;box-sizing:border-box">
             </div>
             <div style="margin-bottom:10px">
                 <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;color:var(--ink-muted)">验证服务器地址</label>
@@ -142,7 +142,7 @@
         <div style="margin-bottom:12px">
             <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
                 <input type="text" id="newUserName" class="form-control" placeholder="用户名" style="flex:1;min-width:120px">
-                <input type="password" id="newUserPw" class="form-control" placeholder="密码" style="flex:1;min-width:120px" oninput="renderCreateUserPwStrength(this.value)">
+                <input type="password" id="newUserPw" class="form-control" name="new-user-password" placeholder="密码" autocomplete="new-password" enterkeyhint="done" style="flex:1;min-width:120px" oninput="renderCreateUserPwStrength(this.value)">
                 <select id="newUserRole" class="form-control" style="min-width:120px">
                     <option value="1">普通用户</option>
                     <option value="10">管理员</option>
@@ -356,7 +356,8 @@ function confirmReset() {
 function createUser() {
     var u = document.getElementById('newUserName').value.trim();
     var p = document.getElementById('newUserPw').value;
-    var r = parseInt(document.getElementById('newUserRole').value);
+    var r = parseInt(document.getElementById('newUserRole').value, 10);
+    if (isNaN(r)) r = 1; // 默认普通用户
     if (!u || !p) { showToast('请填写完整', 'error'); return; }
     fetch('/api/users/create', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p, role:r}) })
     .then(function(r){return r.json()})
@@ -385,7 +386,11 @@ function loadUsers() {
         d.data.forEach(function(u) {
             var tr = document.createElement('tr');
             var roleLabel = u.role === 10 ? '管理员' : '普通用户';
-            tr.innerHTML = '<td style="padding:8px 10px">'+u.username+'</td><td style="padding:8px 10px">'+roleLabel+'</td><td style="padding:8px 10px;color:var(--ink-subtle);font-size:12px">'+(u.login_at||'-')+'</td>';
+            // 用 textContent 安全填充各单元格，避免 username/login_at 注入 HTML
+            var c1 = document.createElement('td'); c1.style.padding='8px 10px'; c1.textContent = u.username || '';
+            var c2 = document.createElement('td'); c2.style.padding='8px 10px'; c2.textContent = roleLabel;
+            var c3 = document.createElement('td'); c3.style.padding='8px 10px'; c3.style.color='var(--ink-subtle)'; c3.style.fontSize='12px'; c3.textContent = u.login_at || '-';
+            tr.appendChild(c1); tr.appendChild(c2); tr.appendChild(c3);
             var td = document.createElement('td');
             td.style.padding = '8px 10px';
             if (u.username !== current) {
@@ -398,7 +403,7 @@ function loadUsers() {
             tr.appendChild(td);
             tbody.appendChild(tr);
         });
-    });
+    }).catch(function(){ /* 网络抖动忽略，下次轮询刷新 */ });
 }
 
 function deleteUser(username) {
@@ -409,7 +414,8 @@ function deleteUser(username) {
         .then(function(d){
             if(d.success){ showToast('用户已删除', 'success'); loadUsers(); }
             else { showToast(d.error||'删除失败', 'error'); }
-        });
+        })
+        .catch(function(){ showToast('请求失败', 'error'); });
     });
 }
 

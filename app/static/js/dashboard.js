@@ -11,8 +11,12 @@ function loadDashboardStats() {
             var td = (d && d.tooldelta) || {};
             var panel = (d && d.panel) || {};
 
-            // CPU 使用率
-            setDashText('dashCpu', fmtPercent(sys.cpu_percent));
+            // CPU 使用率（count-up 动画）
+            if (typeof sys.cpu_percent === 'number') {
+                animateCount('dashCpu', sys.cpu_percent, '%');
+            } else {
+                setDashText('dashCpu', fmtPercent(sys.cpu_percent));
+            }
 
             // 内存使用（已用 / 总量，含百分比）
             setDashText(
@@ -38,11 +42,19 @@ function loadDashboardStats() {
             // 看门狗开关
             setDashText('dashWatchdog', panel.watchdog_enabled ? '开' : '关');
 
-            // 服务器连接数
-            setDashText('dashConnections', panel.connections_count != null ? panel.connections_count : 0);
+            // 服务器连接数（count-up 动画）
+            if (typeof panel.connections_count === 'number') {
+                animateCount('dashConnections', panel.connections_count);
+            } else {
+                setDashText('dashConnections', panel.connections_count != null ? panel.connections_count : 0);
+            }
 
-            // 定时任务数
-            setDashText('dashSchedJobs', panel.scheduler_jobs_count != null ? panel.scheduler_jobs_count : 0);
+            // 定时任务数（count-up 动画）
+            if (typeof panel.scheduler_jobs_count === 'number') {
+                animateCount('dashSchedJobs', panel.scheduler_jobs_count);
+            } else {
+                setDashText('dashSchedJobs', panel.scheduler_jobs_count != null ? panel.scheduler_jobs_count : 0);
+            }
         })
         .catch(function (e) {
             console.error('loadDashboardStats error', e);
@@ -61,6 +73,34 @@ function setDashText(id, value) {
     }
 }
 
+// 数字 count-up 动画：从当前值过渡到目标值（300ms）
+var _countTimers = {};
+function animateCount(id, target, suffix) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    suffix = suffix || '';
+    // 解析当前显示值（支持 "75.0%" / "1.2 GB / 8.0 GB (15.0%)" 这种复合文本时跳过动画）
+    var cur = parseFloat(el.textContent) || 0;
+    if (isNaN(target) || cur === target) { el.textContent = target + suffix; return; }
+    // 清理旧定时器（避免元素被复用时多个动画叠加）
+    if (_countTimers[id]) { clearInterval(_countTimers[id]); delete _countTimers[id]; }
+    var start = cur, delta = target - cur, startTime = Date.now(), dur = 300;
+    _countTimers[id] = setInterval(function() {
+        // 元素可能已被移除（SPA 场景 / 页面切换），定时器需自清理避免泄漏
+        if (!document.getElementById(id)) {
+            clearInterval(_countTimers[id]);
+            delete _countTimers[id];
+            return;
+        }
+        var t = Math.min(1, (Date.now() - startTime) / dur);
+        var eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+        var v = start + delta * eased;
+        // 整数 vs 小数
+        el.textContent = (Number.isInteger(target) ? Math.round(v) : v.toFixed(1)) + suffix;
+        if (t >= 1) { clearInterval(_countTimers[id]); delete _countTimers[id]; }
+    }, 16);
+}
+
 function fmtPercent(v) {
     if (v === undefined || v === null || isNaN(v)) return '0.0%';
     return Number(v).toFixed(1) + '%';
@@ -77,6 +117,7 @@ function fmtGB(gb) {
     return Number(gb).toFixed(2) + ' GB';
 }
 
-// 首次调用 + 每 5 秒轮询
+// 首次调用 + 每 5 秒轮询（统一走 TDPoll：页面隐藏/离线时自动暂停）
+// 不再用裸 setInterval 作 fallback，避免 main.js 加载延迟时双重轮询。
 loadDashboardStats();
-setInterval(loadDashboardStats, 5000);
+if (window.TDPoll) { window.TDPoll.register(loadDashboardStats, 5000); }

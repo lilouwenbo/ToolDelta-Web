@@ -7,7 +7,7 @@
 </div>
 
 <div class="search-bar">
-    <input type="text" id="pluginSearch" placeholder="搜索插件名..." oninput="renderPlugins()" aria-label="搜索插件">
+    <input type="text" id="pluginSearch" placeholder="搜索插件名..." inputmode="search" enterkeyhint="search" oninput="renderPlugins()" aria-label="搜索插件">
     <select id="pluginFilter" onchange="renderPlugins()" aria-label="筛选插件状态">
         <option value="all">全部</option>
         <option value="enabled">已启用</option>
@@ -39,7 +39,7 @@
         <div class="tab-content" id="presetTab" role="tabpanel">
             <div class="form-group">
                 <label for="presetSearch" class="sr-only">搜索预设插件</label>
-                <input type="text" id="presetSearch" class="form-control" placeholder="搜索预设插件..." oninput="renderPresets()">
+                <input type="text" id="presetSearch" class="form-control" placeholder="搜索预设插件..." inputmode="search" enterkeyhint="search" oninput="renderPresets()">
             </div>
             <div id="presetList" class="check-list" style="margin-bottom:8px"></div>
             <div class="form-row" style="align-items:center">
@@ -107,10 +107,21 @@
 var allPlugins = [];
 var allPresets = [];
 
+function _esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(m){
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];
+    });
+}
+
 function loadPlugins() {
     fetch('/api/plugins')
         .then(function(r) { return r.json(); })
-        .then(function(d) { allPlugins = d; renderPlugins(); });
+        .then(function(d) { allPlugins = Array.isArray(d) ? d : []; renderPlugins(); })
+        .catch(function() {
+            allPlugins = [];
+            var c = document.getElementById('pluginList');
+            if (c) c.innerHTML = '<div class="empty-state"><div class="icon" aria-hidden="true">⚠️</div>加载插件失败，请检查网络后刷新</div>';
+        });
 }
 
 // 加载预设插件市场源
@@ -119,7 +130,7 @@ function loadMarketSources() {
         .then(function(r) { return r.json(); })
         .then(function(sources) {
             var sel = document.getElementById('marketUrl');
-            sources.forEach(function(s) {
+            (Array.isArray(sources) ? sources : []).forEach(function(s) {
                 var opt = document.createElement('option');
                 opt.value = s.url;
                 opt.textContent = s.name;
@@ -130,6 +141,10 @@ function loadMarketSources() {
             cust.value = '__custom__';
             cust.textContent = '✏️ 自定义...';
             sel.appendChild(cust);
+        })
+        .catch(function() {
+            var sel = document.getElementById('marketUrl');
+            if (sel) sel.innerHTML = '<option value="">市场源加载失败</option>';
         });
 }
 function onMarketSourceChange() {
@@ -144,27 +159,32 @@ function onMarketSourceChange() {
 loadMarketSources();
 
 function renderPlugins() {
-    var q = document.getElementById('pluginSearch').value.toLowerCase();
-    var filter = document.getElementById('pluginFilter').value;
+    var searchEl = document.getElementById('pluginSearch');
+    var filterEl = document.getElementById('pluginFilter');
+    var q = (searchEl && searchEl.value || '').toLowerCase();
+    var filter = filterEl ? filterEl.value : 'all';
     var list = allPlugins.filter(function(p) {
         if (filter === 'enabled' && !p.is_enabled) return false;
         if (filter === 'disabled' && p.is_enabled) return false;
-        return p.name.toLowerCase().indexOf(q) !== -1;
+        return (p.name || '').toLowerCase().indexOf(q) !== -1;
     });
     var container = document.getElementById('pluginList');
+    if (!container) return;
     if (list.length === 0) {
         container.innerHTML = '<div class="empty-state"><div class="icon" aria-hidden="true">🧩</div>暂无插件</div>';
         return;
     }
     container.innerHTML = list.map(function(p) {
+        // 转义所有外部数据，避免 XSS
+        var keyAttr = _esc(JSON.stringify(p.name));
         return '<div class="plugin-card">' +
-            '<div class="p-name">' + p.name + ' <span class="tag ' + (p.is_enabled ? 'tag-enabled' : 'tag-disabled') + '">' + (p.is_enabled ? '已启用' : '已禁用') + '</span></div>' +
-            '<div class="p-meta">v' + p.version + ' | ' + p.author + ' | <span class="tag tag-classic">' + p.plugin_type + '</span></div>' +
-            '<div class="p-desc">' + (p.description || '暂无描述') + '</div>' +
+            '<div class="p-name">' + _esc(p.name) + ' <span class="tag ' + (p.is_enabled ? 'tag-enabled' : 'tag-disabled') + '">' + (p.is_enabled ? '已启用' : '已禁用') + '</span></div>' +
+            '<div class="p-meta">v' + _esc(p.version) + ' | ' + _esc(p.author) + ' | <span class="tag tag-classic">' + _esc(p.plugin_type) + '</span></div>' +
+            '<div class="p-desc">' + _esc(p.description || '暂无描述') + '</div>' +
             '<div class="p-actions">' +
-            '<button class="btn btn-sm ' + (p.is_enabled ? 'btn-warning' : 'btn-success') + '" onclick="togglePlugin(\'' + p.name + '\',' + (p.is_enabled ? 'false' : 'true') + ')">' + (p.is_enabled ? '禁用' : '启用') + '</button>' +
-            '<button class="btn btn-sm btn-danger" onclick="deletePlugin(\'' + p.name + '\')">删除</button>' +
-            '<button class="btn btn-sm btn-outline" onclick="showPluginDetail(\'' + p.name + '\')">详情</button>' +
+            '<button class="btn btn-sm ' + (p.is_enabled ? 'btn-warning' : 'btn-success') + '" onclick="togglePlugin(' + keyAttr + ',' + (p.is_enabled ? 'false' : 'true') + ')">' + (p.is_enabled ? '禁用' : '启用') + '</button>' +
+            '<button class="btn btn-sm btn-danger" onclick="deletePlugin(' + keyAttr + ')">删除</button>' +
+            '<button class="btn btn-sm btn-outline" onclick="showPluginDetail(' + keyAttr + ')">详情</button>' +
             '</div></div>';
     }).join('');
 }
@@ -173,9 +193,10 @@ function togglePlugin(name, enable) {
     fetch('/api/plugins/toggle', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name, enable:enable}) })
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            if (d.success) { showToast(enable ? '已启用' : '已禁用', 'success'); loadPlugins(); }
-            else showToast('操作失败', 'error');
-        });
+            if (d && d.success) { showToast(enable ? '已启用' : '已禁用', 'success'); loadPlugins(); }
+            else showToast('操作失败: ' + (d && d.error || '未知错误'), 'error');
+        })
+        .catch(function() { showToast('网络请求失败', 'error'); });
 }
 
 function deletePlugin(name) {
@@ -184,46 +205,63 @@ function deletePlugin(name) {
         fetch('/api/plugins/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name}) })
             .then(function(r) { return r.json(); })
             .then(function(d) {
-                if (d.success) { showToast('已删除', 'success'); loadPlugins(); }
-                else showToast('删除失败', 'error');
-            });
+                if (d && d.success) { showToast('已删除', 'success'); loadPlugins(); }
+                else showToast('删除失败: ' + (d && d.error || '未知错误'), 'error');
+            })
+            .catch(function() { showToast('网络请求失败', 'error'); });
     });
 }
 
 function showAddPluginModal() {
-    document.getElementById('addPluginModal').classList.add('active');
+    _openModal('addPluginModal');
     loadPresets();
 }
 
 function closeModal(id) {
-    document.getElementById(id).classList.remove('active');
+    _closeModal(id);
 }
 
 function uploadPlugin() {
     var fileInput = document.getElementById('pluginZip');
-    if (!fileInput.files[0]) { showToast('请选择 .zip 文件', 'error'); return; }
+    if (!fileInput || !fileInput.files[0]) { showToast('请选择 .zip 文件', 'error'); return; }
     var form = new FormData();
     form.append('file', fileInput.files[0]);
-    document.getElementById('uploadProgress').textContent = '上传中...';
+    var prog = document.getElementById('uploadProgress');
+    var btn = document.querySelector('#uploadTab .btn-primary');
+    if (prog) prog.textContent = '上传中...';
+    if (btn) { btn.disabled = true; }
     fetch('/api/plugins/upload', { method:'POST', body:form })
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            document.getElementById('uploadProgress').textContent = d.success ? '安装成功' : '失败: ' + (d.error || '未知错误');
-            if (d.success) { loadPlugins(); setTimeout(function() { closeModal('addPluginModal'); }, 1000); }
-        });
+            if (prog) prog.textContent = (d && d.success) ? '安装成功' : '失败: ' + ((d && d.error) || '未知错误');
+            if (d && d.success) { loadPlugins(); setTimeout(function() { closeModal('addPluginModal'); }, 1000); }
+        })
+        .catch(function() {
+            if (prog) prog.textContent = '上传失败，请检查网络';
+            showToast('上传失败', 'error');
+        })
+        .then(function() { if (btn) { btn.disabled = false; } });
 }
 
 function loadPresets() {
     fetch('/api/plugins/presets')
         .then(function(r) { return r.json(); })
-        .then(function(d) { allPresets = d; renderPresets(); });
+        .then(function(d) { allPresets = Array.isArray(d) ? d : []; renderPresets(); })
+        .catch(function() {
+            allPresets = [];
+            var el = document.getElementById('presetList');
+            if (el) el.innerHTML = '<div style="color:var(--ink-subtle);font-size:13px">预设加载失败</div>';
+        });
 }
 
 function renderPresets() {
-    var q = document.getElementById('presetSearch').value.toLowerCase();
-    var list = allPresets.filter(function(p) { return p.name.toLowerCase().indexOf(q) !== -1 || p.id.toLowerCase().indexOf(q) !== -1; });
+    var q = (document.getElementById('presetSearch').value || '').toLowerCase();
+    var list = allPresets.filter(function(p) {
+        return (p.name || '').toLowerCase().indexOf(q) !== -1 || (p.id || '').toLowerCase().indexOf(q) !== -1;
+    });
     document.getElementById('presetList').innerHTML = list.map(function(p) {
-        return '<label><input type="checkbox" class="preset-cb" value="' + p.id + '"> ' + p.name + ' <span style="color:var(--ink-subtle)">v' + p.version + ' | ' + p.author + '</span></label>';
+        // 转义所有外部数据，避免 XSS；checkbox value 用双引号转义后的值
+        return '<label><input type="checkbox" class="preset-cb" value="' + _esc(p.id) + '"> ' + _esc(p.name) + ' <span style="color:var(--ink-subtle)">v' + _esc(p.version) + ' | ' + _esc(p.author) + '</span></label>';
     }).join('');
 }
 
@@ -236,36 +274,50 @@ function installPresets() {
     var ids = [];
     document.querySelectorAll('.preset-cb:checked').forEach(function(cb) { ids.push(cb.value); });
     if (!ids.length) { showToast('请选择至少一个插件', 'error'); return; }
+    var btn = document.querySelector('#presetTab .btn-success');
+    if (btn) { btn.disabled = true; btn.textContent = '安装中...'; }
     fetch('/api/plugins/install-preset-batch', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({plugin_ids: ids}) })
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            var ok = d.results.filter(function(r) { return r.success; }).length;
+            var results = (d && d.results) || [];
+            var ok = results.filter(function(r) { return r.success; }).length;
             showToast('安装完成: ' + ok + '/' + ids.length + ' 成功', ok === ids.length ? 'success' : 'info');
             loadPlugins();
-        });
+        })
+        .catch(function() { showToast('批量安装请求失败', 'error'); })
+        .then(function() { if (btn) { btn.disabled = false; btn.textContent = '批量安装'; } });
 }
 
 function connectMarket() {
     var sel = document.getElementById('marketUrl');
     var url = sel.value === '__custom__' ? document.getElementById('customMarketUrl').value.trim() : sel.value.trim();
     if (!url) { showToast('请选择或输入插件市场源', 'error'); return; }
+    var btn = document.querySelector('#networkTab .btn-primary');
+    if (btn) { btn.disabled = true; btn.textContent = '连接中...'; }
     fetch('/api/market/connect', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url: url}) })
         .then(function(r) { return r.json(); })
         .then(function(d) {
             var container = document.getElementById('networkPluginList');
-            if (!d.success) { container.innerHTML = '<div style="color:var(--danger)">连接失败: ' + d.error + '</div>'; return; }
-            container.innerHTML = '<div style="font-size:13px;margin-bottom:8px">' + d.source_name + ' - ' + d.plugins.length + ' 个插件</div>' +
-                '<div class="check-list">' + d.plugins.map(function(p) {
-                    return '<label><input type="checkbox" class="net-cb" value="' + p.id + '" data-url="' + url + '"> ' + p.name + ' <span style="color:var(--ink-subtle)">v' + p.version + ' | ' + p.author + '</span></label>';
-                }).join('') + '</div>' +
-                '<button class="btn btn-success btn-sm" style="margin-top:8px" onclick="installNetwork()">安装选中插件</button>';
-        });
+            if (!d || !d.success) {
+                container.innerHTML = '<div style="color:var(--danger)">连接失败: ' + _esc((d && d.error) || '未知错误') + '</div>';
+                return;
+            }
+            var plugins = (d.plugins || []).map(function(p) {
+                return '<label><input type="checkbox" class="net-cb" value="' + _esc(p.id) + '" data-url="' + _esc(url) + '"> ' + _esc(p.name) + ' <span style="color:var(--ink-subtle)">v' + _esc(p.version) + ' | ' + _esc(p.author) + '</span></label>';
+            }).join('');
+            container.innerHTML = '<div style="font-size:13px;margin-bottom:8px">' + _esc(d.source_name) + ' - ' + (d.plugins || []).length + ' 个插件</div>' +
+                '<div class="check-list">' + plugins + '</div>' +
+                '<button class="btn btn-success btn-sm" style="margin-top:8px" onclick="installNetwork(this)">安装选中插件</button>';
+        })
+        .catch(function() { showToast('连接市场源失败，请检查网络', 'error'); })
+        .then(function() { if (btn) { btn.disabled = false; btn.textContent = '连接并获取列表'; } });
 }
 
-function installNetwork() {
+function installNetwork(btn) {
     var cbs = document.querySelectorAll('.net-cb:checked');
     if (!cbs.length) { showToast('请选择至少一个插件', 'error'); return; }
-    var ok = 0, total = cbs.length;
+    var total = cbs.length, done = 0, ok = 0;
+    if (btn) { btn.disabled = true; btn.textContent = '安装中...'; }
     cbs.forEach(function(cb) {
         var url = cb.getAttribute('data-url');
         var id = cb.value;
@@ -273,9 +325,15 @@ function installNetwork() {
             .then(function(r) { return r.json(); })
             .then(function(d) {
                 if (d.success) ok++;
-                if (ok + (total - [...cbs].indexOf(cb) - 1) === total) {
-                    showToast('安装完成: ' + ok + '/' + total + ' 成功', 'success');
+            })
+            .catch(function() {})
+            .then(function() {
+                // 计数器模式：所有请求完成后统一提示，避免竞态
+                done++;
+                if (done === total) {
+                    showToast('安装完成: ' + ok + '/' + total + ' 成功', ok === total ? 'success' : 'info');
                     loadPlugins();
+                    if (btn) { btn.disabled = false; btn.textContent = '安装选中插件'; }
                 }
             });
     });
@@ -284,36 +342,59 @@ function installNetwork() {
 function showPluginDetail(name) {
     var p = allPlugins.find(function(x) { return x.name === name; });
     if (!p) return;
+    currentDetailName = name; // 提前设置，避免后续刷新依赖 data-files 回调
     document.getElementById('detailName').textContent = p.name;
+    // 转义所有外部数据
     document.getElementById('detailInfoTab').innerHTML =
-        '<table><tr><td style="width:100px">版本</td><td>v' + p.version + '</td></tr>' +
-        '<tr><td>作者</td><td>' + p.author + '</td></tr>' +
-        '<tr><td>类型</td><td>' + p.plugin_type + '</td></tr>' +
+        '<table><tr><td style="width:100px">版本</td><td>v' + _esc(p.version) + '</td></tr>' +
+        '<tr><td>作者</td><td>' + _esc(p.author) + '</td></tr>' +
+        '<tr><td>类型</td><td>' + _esc(p.plugin_type) + '</td></tr>' +
         '<tr><td>状态</td><td>' + (p.is_enabled ? '已启用' : '已禁用') + '</td></tr>' +
-        '<tr><td>描述</td><td>' + (p.description || '无') + '</td></tr></table>';
+        '<tr><td>描述</td><td>' + _esc(p.description || '无') + '</td></tr></table>';
     document.getElementById('detailConfig').textContent = '加载中...';
     document.getElementById('detailDataList').innerHTML = '<div class="spinner"></div>';
     document.getElementById('detailReadme').innerHTML = '<div class="spinner"></div>';
-    document.getElementById('pluginDetailModal').classList.add('active');
+    _openModal('pluginDetailModal');
 
-    fetch('/api/plugins/config?name=' + name)
+    fetch('/api/plugins/config?name=' + encodeURIComponent(name))
         .then(function(r) { return r.json(); })
         .then(function(d) {
             var el = document.getElementById('detailConfig');
-            if (el) el.textContent = d.error ? '无配置文件' : JSON.stringify(d, null, 2);
+            if (el) el.textContent = (d && d.error) ? '无配置文件' : JSON.stringify(d, null, 2);
+        })
+        .catch(function() {
+            var el = document.getElementById('detailConfig');
+            if (el) el.textContent = '加载配置失败';
         });
 
-    fetch('/api/plugins/data-files?name=' + name)
+    fetch('/api/plugins/data-files?name=' + encodeURIComponent(name))
         .then(function(r) { return r.json(); })
         .then(function(d) {
             renderDataFiles(d, name);
+        })
+        .catch(function() {
+            var el = document.getElementById('detailDataList');
+            if (el) el.innerHTML = '<div style="font-size:13px;color:var(--ink-subtle)">加载数据文件失败</div>';
         });
 
-    fetch('/api/plugins/readme?name=' + name)
+    fetch('/api/plugins/readme?name=' + encodeURIComponent(name))
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            if (d.error) document.getElementById('detailReadme').innerHTML = '<div style="font-size:13px;color:var(--ink-subtle)">无文档</div>';
-            else document.getElementById('detailReadme').innerHTML = '<pre style="font-size:12px;white-space:pre-wrap">' + d.content + '</pre>';
+            if (!d || d.error) {
+                document.getElementById('detailReadme').innerHTML = '<div style="font-size:13px;color:var(--ink-subtle)">无文档</div>';
+            } else {
+                // readme 内容用 textContent 渲染到 pre，避免 HTML 注入
+                var pre = document.createElement('pre');
+                pre.style.cssText = 'font-size:12px;white-space:pre-wrap';
+                pre.textContent = d.content || '';
+                var rd = document.getElementById('detailReadme');
+                rd.innerHTML = '';
+                rd.appendChild(pre);
+            }
+        })
+        .catch(function() {
+            var rd = document.getElementById('detailReadme');
+            if (rd) rd.innerHTML = '<div style="font-size:13px;color:var(--ink-subtle)">加载文档失败</div>';
         });
 }
 
@@ -322,17 +403,28 @@ var currentDetailName = null;
 function renderDataFiles(files, name) {
     currentDetailName = name;
     var html = '';
-    if (files.length === 0) {
+    if (!files || files.length === 0) {
         html = '<div style="font-size:13px;color:var(--ink-subtle);margin-bottom:8px">无数据文件</div>';
     } else {
-        html = files.map(function(f) {
-            var safe = f.replace(/'/g, "\\'");
-            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px;border-bottom:1px solid var(--hairline)">' +
-                '<span>' + f + '</span>' +
-                '<button class="btn btn-sm btn-danger" onclick="deleteDataFile(\'' + name + "','" + safe + "')" + '">删除</button></div>';
-        }).join('');
+        // 使用 data-* 属性传递参数，避免 onclick 字符串拼接的 XSS
+        html = '<div class="data-file-list">';
+        files.forEach(function(f) {
+            html += '<div class="data-file-row" data-name="' + _esc(name) + '" data-file="' + _esc(f) + '">' +
+                '<span>' + _esc(f) + '</span>' +
+                '<button class="btn btn-sm btn-danger" onclick="deleteDataFileFromAttr(this)">删除</button>' +
+                '</div>';
+        });
+        html += '</div>';
     }
     document.getElementById('detailDataList').innerHTML = html;
+}
+
+function deleteDataFileFromAttr(btn) {
+    var row = btn.closest('.data-file-row');
+    if (!row) return;
+    var name = row.getAttribute('data-name');
+    var filename = row.getAttribute('data-file');
+    deleteDataFile(name, filename);
 }
 
 function uploadDataFile() {
@@ -341,13 +433,17 @@ function uploadDataFile() {
     var form = new FormData();
     form.append('name', currentDetailName);
     form.append('file', input.files[0]);
-    document.getElementById('dataUploadInput').disabled = true;
+    input.disabled = true;
     fetch('/api/plugins/data-upload', { method: 'POST', body: form })
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            if (d.success) { showToast('上传成功', 'success'); refreshDataFiles(); }
-            else showToast('上传失败', 'error');
-            document.getElementById('dataUploadInput').disabled = false;
+            if (d && d.success) { showToast('上传成功', 'success'); refreshDataFiles(); }
+            else showToast('上传失败: ' + ((d && d.error) || '未知错误'), 'error');
+        })
+        .catch(function() { showToast('上传请求失败', 'error'); })
+        .then(function() {
+            input.disabled = false;
+            input.value = ''; // 清空，便于再次选择同名文件
         });
 }
 
@@ -357,13 +453,17 @@ function uploadConfigFile() {
     var form = new FormData();
     form.append('name', currentDetailName);
     form.append('file', input.files[0]);
-    document.getElementById('configUploadInput').disabled = true;
+    input.disabled = true;
     fetch('/api/plugins/config-upload', { method: 'POST', body: form })
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            if (d.success) { showToast('上传成功', 'success'); refreshConfigFile(); }
-            else showToast('上传失败', 'error');
-            document.getElementById('configUploadInput').disabled = false;
+            if (d && d.success) { showToast('上传成功', 'success'); refreshConfigFile(); }
+            else showToast('上传失败: ' + ((d && d.error) || '未知错误'), 'error');
+        })
+        .catch(function() { showToast('上传请求失败', 'error'); })
+        .then(function() {
+            input.disabled = false;
+            input.value = '';
         });
 }
 
@@ -373,24 +473,33 @@ function deleteDataFile(name, filename) {
         fetch('/api/plugins/data-delete', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: name, file: filename}) })
             .then(function(r) { return r.json(); })
             .then(function(d) {
-                if (d.success) { showToast('已删除', 'success'); refreshDataFiles(); }
-                else showToast('删除失败', 'error');
-            });
+                if (d && d.success) { showToast('已删除', 'success'); refreshDataFiles(); }
+                else showToast('删除失败: ' + ((d && d.error) || '未知错误'), 'error');
+            })
+            .catch(function() { showToast('删除请求失败', 'error'); });
     });
 }
 
 function refreshDataFiles() {
-    fetch('/api/plugins/data-files?name=' + currentDetailName)
+    fetch('/api/plugins/data-files?name=' + encodeURIComponent(currentDetailName))
         .then(function(r) { return r.json(); })
-        .then(function(d) { renderDataFiles(d, currentDetailName); });
+        .then(function(d) { renderDataFiles(d, currentDetailName); })
+        .catch(function() {
+            var el = document.getElementById('detailDataList');
+            if (el) el.innerHTML = '<div style="font-size:13px;color:var(--ink-subtle)">刷新数据文件失败</div>';
+        });
 }
 
 function refreshConfigFile() {
-    fetch('/api/plugins/config?name=' + currentDetailName)
+    fetch('/api/plugins/config?name=' + encodeURIComponent(currentDetailName))
         .then(function(r) { return r.json(); })
         .then(function(d) {
             var el = document.getElementById('detailConfig');
-            if (el) el.textContent = d.error ? '无配置文件' : JSON.stringify(d, null, 2);
+            if (el) el.textContent = (d && d.error) ? '无配置文件' : JSON.stringify(d, null, 2);
+        })
+        .catch(function() {
+            var el = document.getElementById('detailConfig');
+            if (el) el.textContent = '刷新配置失败';
         });
 }
 

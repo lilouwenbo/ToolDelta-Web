@@ -4,13 +4,13 @@
 <div class="page-header">
     <h1>看门狗</h1>
     <div>
-        <button class="btn btn-primary" onclick="enableWatchdog()">启用</button>
-        <button class="btn btn-outline" onclick="disableWatchdog()">禁用</button>
+        <button class="btn btn-primary" onclick="enableWatchdog(this)">启用</button>
+        <button class="btn btn-outline" onclick="disableWatchdog(this)">禁用</button>
     </div>
 </div>
 
 <div class="card" style="margin-bottom:20px">
-    <h3>监控配置</h3>
+    <h2>监控配置</h2>
     <p class="help-text">
         看门狗会定期检查 ToolDelta 主进程是否存活，进程停止/崩溃时按下面的策略自动重启。
     </p>
@@ -23,7 +23,7 @@
 
     <div class="form-group">
         <label for="cfg_check_interval">检查间隔（秒）</label>
-        <input type="number" id="cfg_check_interval" class="form-control" min="1" value="10">
+        <input type="number" id="cfg_check_interval" class="form-control" min="1" value="10" inputmode="numeric" enterkeyhint="next">
     </div>
 
     <div class="form-group">
@@ -34,19 +34,19 @@
 
     <div class="form-group">
         <label for="cfg_max_restarts">最大重启次数</label>
-        <input type="number" id="cfg_max_restarts" class="form-control" min="0" value="5">
+        <input type="number" id="cfg_max_restarts" class="form-control" min="0" value="5" inputmode="numeric" enterkeyhint="next">
     </div>
 
     <div class="form-group">
         <label for="cfg_restart_cooldown">重启冷却时间（秒）</label>
-        <input type="number" id="cfg_restart_cooldown" class="form-control" min="0" value="30">
+        <input type="number" id="cfg_restart_cooldown" class="form-control" min="0" value="30" inputmode="numeric" enterkeyhint="done">
     </div>
 
     <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
 </div>
 
 <div class="card">
-    <h3>运行状态</h3>
+    <h2>运行状态</h2>
     <div id="statusArea" class="status-area" role="status" aria-live="polite">
         <div class="loading-text">加载中...</div>
     </div>

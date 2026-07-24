@@ -1,5 +1,13 @@
 // 控制台交互：命令发送 + 历史回溯(↑/↓) + Tab 自动补全(基于命令库) + 收藏快捷发送
-var socket = io({ transports: ['polling'] });
+// socket 重连配置：指数退避，避免移动端弱网下高频重连耗电
+var socket = io({
+    transports: ['polling'],
+    reconnection: true,
+    reconnectionAttempts: Infinity,   // 持续重连（用户手动离开页面时连接自然关闭）
+    reconnectionDelay: 1000,          // 首次重连 1s
+    reconnectionDelayMax: 10000,     // 退避上限 10s
+    reconnectionJitter: 0.5          // 抖动 50%，避免多客户端同步重连压垮服务器
+});
 var body = document.getElementById('consoleBody');
 var input = document.getElementById('consoleInput');
 var statusEl = document.getElementById('consoleStatus');
@@ -47,16 +55,34 @@ function appendLine(html) {
             parent.removeChild(tag);
         }
     }
-    body.appendChild(div);
+    // 批量插入缓冲：高频输出（如日志刷屏）时合并到下一帧统一插入，避免逐行重排卡顿
+    if (_batchBuffer === null) {
+        _batchBuffer = document.createDocumentFragment();
+        _batchPending = { atBottom: atBottom, count: 0 };
+        requestAnimationFrame(_flushBatch);
+    }
+    _batchBuffer.appendChild(div);
+    _batchPending.count++;
+    _batchPending.atBottom = _batchPending.atBottom && atBottom;
+}
+var _batchBuffer = null;
+var _batchPending = null;
+function _flushBatch() {
+    if (!_batchBuffer || !_batchPending || !body) { _batchBuffer = null; _batchPending = null; return; }
+    var frag = _batchBuffer;
+    var info = _batchPending;
+    _batchBuffer = null;
+    _batchPending = null;
+    body.appendChild(frag);
     // 行数上限：保留最近 1000 行
     while (body.children.length > 1000) {
         body.removeChild(body.firstChild);
     }
-    if (atBottom) {
+    if (info.atBottom) {
         body.scrollTop = body.scrollHeight;
     } else {
         // 用户未在底部：累计未读，显示新消息提示
-        _newMsgCount++;
+        _newMsgCount += info.count;
         if (_pillCount) _pillCount.textContent = _newMsgCount;
         if (_pill) _pill.style.display = '';
     }
@@ -77,6 +103,11 @@ function sendConsoleInput() {
 function sendCommand(cmd) {
     cmd = (cmd || '').trim();
     if (!cmd) return;
+    // socket 未连接时拒绝发送并提示，避免命令静默丢失
+    if (!socket.connected) {
+        appendLine('<span class="c-err">⚠ 未连接到服务器，命令未发送。请等待重连后重试。</span>');
+        return;
+    }
     // 防连点/连发：命令发送间隔过短时忽略（P2-7）
     if (_sendingCmd) return;
     _sendingCmd = true;
@@ -124,7 +155,7 @@ function complete() {
     moveCursorEnd(input);
 }
 
-if (body) body.innerHTML = '<div class="c-loading">正在加载输出...</div>';
+if (body) body.innerHTML = '<div class="c-loading"><span class="spinner" style="vertical-align:middle;margin-right:6px"></span>正在加载输出...</div>';
 
 if (body) {
     fetch('/api/tool/output?tail=200&html=1')
@@ -133,7 +164,7 @@ if (body) {
             body.innerHTML = '';
             if (d.lines && d.lines.length) d.lines.forEach(appendLine);
         })
-        .catch(function () { body.innerHTML = '<div class="c-err">获取历史输出失败</div>'; });
+        .catch(function () { body.innerHTML = '<div class="c-err">⚠ 获取历史输出失败，请刷新重试</div>'; });
 }
 
 // 拉取统一命令库用于 Tab 补全（静态扫描 + 运行时注册）
@@ -151,13 +182,45 @@ fetch('/api/commands')
         });
         cmdLibrary = lib;
     })
-    .catch(function () { cmdLibrary = []; });
+    .catch(function () {
+        cmdLibrary = [];
+        // 补全库加载失败时在控制台提示一次（不阻塞使用）
+        appendLine('<span class="c-hint">ℹ 命令补全库加载失败，Tab 补全不可用</span>');
+    });
 
 socket.on('connect', function () {
     if (statusEl) { statusEl.textContent = '已连接'; statusEl.className = 'status-conn connected'; }
+    var bar = document.querySelector('.console-bar');
+    if (bar) bar.classList.add('is-connected');
 });
 socket.on('disconnect', function () {
     if (statusEl) { statusEl.textContent = '已断开'; statusEl.className = 'status-conn disconnected'; }
+    var bar = document.querySelector('.console-bar');
+    if (bar) bar.classList.remove('is-connected');
+});
+// 移动端弱网：重连尝试提示（带尝试次数显示）
+// 弱网下 connect_error 高频触发，对 statusEl 的 DOM 更新做节流，避免每秒多次重排
+var _reconnShown = false;
+var _reconnAttempts = 0;
+var _reconnRaf = null;
+socket.on('connect_error', function () {
+    _reconnAttempts++;
+    if (!_reconnShown) {
+        _reconnShown = true;
+        showToast('连接中…若持续失败请检查网络', 'warning');
+    }
+    // rAF 合并：同一帧内多次 connect_error 只更新一次 DOM
+    if (_reconnRaf || !statusEl) return;
+    _reconnRaf = requestAnimationFrame(function () {
+        _reconnRaf = null;
+        statusEl.textContent = '重连中(' + _reconnAttempts + ')';
+        statusEl.className = 'status-conn disconnected';
+    });
+});
+socket.on('reconnect', function () {
+    if (_reconnRaf) { cancelAnimationFrame(_reconnRaf); _reconnRaf = null; }
+    if (_reconnShown) { _reconnShown = false; showToast('已重新连接', 'success'); }
+    _reconnAttempts = 0;
 });
 socket.on('console_output', function (data) { appendLine(data.data_html || data.data || ''); });
 
@@ -171,15 +234,21 @@ function _isAtBottom() {
     return body.scrollHeight - body.scrollTop - body.clientHeight < 50;
 }
 if (body) {
+    // scroll 节流（rAF）：高频滚动时避免每帧多次回调造成卡顿
+    var _scrollRaf = null;
     body.addEventListener('scroll', function () {
-        if (_isAtBottom()) {
-            _newMsgCount = 0;
-            if (_pill) _pill.style.display = 'none';
-            if (_scrollBtn) _scrollBtn.style.display = 'none';
-        } else if (_scrollBtn) {
-            _scrollBtn.style.display = '';
-        }
-    });
+        if (_scrollRaf) return;
+        _scrollRaf = requestAnimationFrame(function () {
+            _scrollRaf = null;
+            if (_isAtBottom()) {
+                _newMsgCount = 0;
+                if (_pill) _pill.style.display = 'none';
+                if (_scrollBtn) _scrollBtn.style.display = 'none';
+            } else if (_scrollBtn) {
+                _scrollBtn.style.display = '';
+            }
+        });
+    }, { passive: true });
 }
 function scrollToBottom() {
     if (!body) return;
@@ -191,11 +260,27 @@ if (_pill) _pill.addEventListener('click', scrollToBottom);
 
 function copyAllConsole() {
     if (!body) return;
+    // 仅遍历元素子节点（跳过空白文本节点），避免每行多出空行
     var text = '';
-    body.childNodes.forEach(function (n) { text += n.textContent + '\n'; });
-    navigator.clipboard.writeText(text).then(function () {
-        showToast('已复制全部输出', 'success');
-    }).catch(function () { showToast('复制失败', 'error'); });
+    for (var i = 0; i < body.children.length; i++) {
+        text += body.children[i].textContent + '\n';
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+            showToast('已复制全部输出', 'success');
+        }).catch(function () { showToast('复制失败', 'error'); });
+    } else {
+        // 回退：使用临时 textarea（旧浏览器 / 非 https 环境）
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); showToast('已复制全部输出', 'success'); }
+        catch (e) { showToast('复制失败', 'error'); }
+        document.body.removeChild(ta);
+    }
 }
 
 if (input) {
