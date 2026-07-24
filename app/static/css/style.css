@@ -252,7 +252,9 @@ pre { white-space: pre-wrap; word-break: break-all; }
   margin-bottom: 32px;
 }
 .page-header h1 {
-  font-size: 22px;
+  /* 流式字体（参考 2026 响应式最佳实践）：小屏 20px → 大屏 26px 平滑过渡，
+     避免传统断点跳变造成的视觉突兀。clamp 兼容性 iOS13+/Android5+ 已全覆盖。 */
+  font-size: clamp(20px, 2.2vw + 14px, 26px);
   font-weight: 600;
   letter-spacing: -0.4px;
   color: var(--ink);
@@ -325,7 +327,8 @@ pre { white-space: pre-wrap; word-break: break-all; }
   font-weight: 500;
 }
 .stat-card .stat-value {
-  font-size: 28px;
+  /* 流式字体：小屏 24px → 大屏 32px，避免断点跳变 */
+  font-size: clamp(24px, 1.6vw + 20px, 32px);
   font-weight: 600;
   letter-spacing: -0.6px;
   color: var(--ink);

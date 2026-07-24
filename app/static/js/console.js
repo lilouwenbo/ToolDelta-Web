@@ -200,10 +200,25 @@ socket.on('disconnect', function () {
 });
 // 移动端弱网：重连尝试提示（带尝试次数显示）
 // 弱网下 connect_error 高频触发，对 statusEl 的 DOM 更新做节流，避免每秒多次重排
+// 参考 Pterodactyl v1.12.0：对不可恢复错误（认证失败 401/403）停止重连，避免无限重连耗电
 var _reconnShown = false;
 var _reconnAttempts = 0;
 var _reconnRaf = null;
-socket.on('connect_error', function () {
+var _reconnFatal = false; // 不可恢复错误标志：认证失效后不再重连
+socket.on('connect_error', function (err) {
+    // 认证类错误：token 过期/会话失效，重连无意义，直接停止并提示重新登录
+    var desc = (err && (err.description || err.message)) || '';
+    var status = (err && (err.context && err.context.code)) || (err && err.status) || 0;
+    if (status === 401 || status === 403 || /auth|forbidden|unauthorized|401|403/i.test(desc)) {
+        if (!_reconnFatal) {
+            _reconnFatal = true;
+            socket.io.opts.reconnection = false; // 关闭自动重连
+            if (socket.io.conn) socket.io.conn.close(); // 中止进行中的重连
+            if (statusEl) { statusEl.textContent = '认证失效'; statusEl.className = 'status-conn disconnected'; }
+            showToast('登录已失效，请刷新页面重新登录', 'error');
+        }
+        return;
+    }
     _reconnAttempts++;
     if (!_reconnShown) {
         _reconnShown = true;
