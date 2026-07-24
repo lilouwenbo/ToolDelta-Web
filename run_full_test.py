@@ -598,6 +598,63 @@ with open(js_path, "r", encoding="utf-8") as _f:
 rec("console.js 含 sendConsoleInput 函数", "function sendConsoleInput" in js_src, "")
 rec("console.js 兼容 keyCode 13", "e.keyCode === 13" in js_src, "")
 
+# R12. Toast 升级 / 自定义输入弹窗 / 全局快捷键
+main_js_path = os.path.join(ROOT, "app", "static", "js", "main.js")
+with open(main_js_path, "r", encoding="utf-8") as _f:
+    main_js = _f.read()
+rec("main.js Toast 堆叠上限", "_TOAST_MAX" in main_js, "")
+rec("main.js Toast 分类型时长", "_TOAST_DURATIONS" in main_js, "")
+rec("main.js Toast 点击关闭", "removeToast" in main_js, "")
+rec("main.js Toast 悬停暂停", "mouseenter" in main_js, "")
+rec("main.js Toast 进度条", "toast-bar" in main_js, "")
+rec("main.js showPrompt 自定义输入弹窗", "function showPrompt" in main_js, "")
+rec("main.js closePrompt 关闭输入弹窗", "function closePrompt" in main_js, "")
+rec("main.js Esc 关闭弹窗", "Escape" in main_js, "")
+rec("main.js 焦点陷阱 Tab 循环", "keyCode === 9" in main_js, "")
+rec("main.js 背景点击关闭", "modal-overlay" in main_js, "")
+rec("main.js 全局快捷键 / 聚焦搜索", "e.key !== '/'" in main_js or "e.key === '/'" in main_js, "")
+rec("main.js withGuard 防双击", "function withGuard" in main_js, "")
+rec("base.html 含 promptModal", "promptModal" in html_base, "")
+# CSS 升级
+rec("CSS Toast toast-out 退场动画", "toastOut" in css, "")
+rec("CSS Toast warning 类型", ".toast.warning" in css, "")
+rec("CSS 骨架屏 skeleton", ".skeleton" in css and "shimmer" in css, "")
+rec("CSS 按钮加载 spinner", ".btn-spinner" in css, "")
+rec("CSS 插件卡片 hover 上浮", "translateY(-2px)" in css, "")
+rec("CSS 空状态提示 empty-hint", ".empty-hint" in css, "")
+
+# R13. 控制台状态点 / 新消息 pill / 复制
+console_html = open(os.path.join(ROOT, "app", "templates", "console.html"), "r", encoding="utf-8").read()
+console_js = open(os.path.join(ROOT, "app", "static", "js", "console.js"), "r", encoding="utf-8").read()
+rec("console.html 状态点 connected 类", "status-conn connected" in console_html or "status-conn disconnected" in console_html, "")
+rec("console.html 新消息 pill", "new-msg-pill" in console_html, "")
+rec("console.html 复制全部按钮", "copyAllConsole" in console_html, "")
+rec("console.html 滚动到最新按钮", "scrollBottomBtn" in console_html, "")
+rec("console.js 状态切换 connected", "statusEl.className = 'status-conn connected'" in console_js, "")
+rec("console.js 新消息累计", "_newMsgCount" in console_js, "")
+rec("console.js copyAllConsole 函数", "function copyAllConsole" in console_js, "")
+rec("console.js scrollToBottom 函数", "function scrollToBottom" in console_js, "")
+
+# R14. 文件页拖拽上传 / 上级目录 / 自定义弹窗替代 prompt
+files_html = open(os.path.join(ROOT, "app", "templates", "files.html"), "r", encoding="utf-8").read()
+rec("files.html 拖拽上传区域", "drop-zone" in files_html, "")
+rec("files.html 拖拽提示", "drop-hint" in files_html, "")
+rec("files.html dragenter 事件", "dragenter" in files_html, "")
+rec("files.html drop 事件", "addEventListener('drop'" in files_html, "")
+rec("files.html 上级目录按钮", "up-btn" in files_html, "")
+rec("files.html 重命名用 showPrompt", "showPrompt" in files_html, "")
+rec("files.html 新建文件夹用 showPrompt", files_html.count("showPrompt") >= 2, "")
+rec("files.html 空状态含上传 CTA", "上传第一个文件" in files_html, "")
+rec("files.html 上传按钮 spinner", "btn-spinner" in files_html, "")
+
+# R15. 空状态占位符替换（--- → emoji）
+market_html = open(os.path.join(ROOT, "app", "templates", "market.html"), "r", encoding="utf-8").read()
+commands_html = open(os.path.join(ROOT, "app", "templates", "commands.html"), "r", encoding="utf-8").read()
+rec("market.html 空状态无 --- 占位符", 'icon">---' not in market_html, "")
+rec("market.html 空状态有 emoji", '🛒' in market_html, "")
+rec("commands.html 空状态无 --- 占位符", 'icon">---' not in commands_html, "")
+rec("commands.html 空状态有 emoji", '⌨️' in commands_html, "")
+
 passed = sum(1 for _, ok, _ in results if ok)
 failed = [n for n, ok, _ in results if not ok]
 print("\n========================================")

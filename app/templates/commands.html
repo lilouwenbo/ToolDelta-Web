@@ -69,7 +69,7 @@ function renderCommands() {
 
     var container = document.getElementById('cmdList');
     if (data.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">---</div>未找到命令</div>';
+        container.innerHTML = '<div class="empty-state"><div class="icon" aria-hidden="true">⌨️</div>未找到命令<p class="empty-hint">尝试更换关键词或浏览其他分组</p></div>';
         return;
     }
 

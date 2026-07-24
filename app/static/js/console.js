@@ -52,7 +52,14 @@ function appendLine(html) {
     while (body.children.length > 1000) {
         body.removeChild(body.firstChild);
     }
-    if (atBottom) body.scrollTop = body.scrollHeight;
+    if (atBottom) {
+        body.scrollTop = body.scrollHeight;
+    } else {
+        // 用户未在底部：累计未读，显示新消息提示
+        _newMsgCount++;
+        if (_pillCount) _pillCount.textContent = _newMsgCount;
+        if (_pill) _pill.style.display = '';
+    }
 }
 
 var _sendingCmd = false;
@@ -146,9 +153,50 @@ fetch('/api/commands')
     })
     .catch(function () { cmdLibrary = []; });
 
-socket.on('connect', function () { if (statusEl) statusEl.textContent = '已连接'; });
-socket.on('disconnect', function () { if (statusEl) statusEl.textContent = '已断开'; });
+socket.on('connect', function () {
+    if (statusEl) { statusEl.textContent = '已连接'; statusEl.className = 'status-conn connected'; }
+});
+socket.on('disconnect', function () {
+    if (statusEl) { statusEl.textContent = '已断开'; statusEl.className = 'status-conn disconnected'; }
+});
 socket.on('console_output', function (data) { appendLine(data.data_html || data.data || ''); });
+
+// 新消息提示：用户向上滚动时累计未读消息数，显示 pill
+var _newMsgCount = 0;
+var _scrollBtn = document.getElementById('scrollBottomBtn');
+var _pill = document.getElementById('newMsgPill');
+var _pillCount = document.getElementById('newMsgCount');
+function _isAtBottom() {
+    if (!body) return true;
+    return body.scrollHeight - body.scrollTop - body.clientHeight < 50;
+}
+if (body) {
+    body.addEventListener('scroll', function () {
+        if (_isAtBottom()) {
+            _newMsgCount = 0;
+            if (_pill) _pill.style.display = 'none';
+            if (_scrollBtn) _scrollBtn.style.display = 'none';
+        } else if (_scrollBtn) {
+            _scrollBtn.style.display = '';
+        }
+    });
+}
+function scrollToBottom() {
+    if (!body) return;
+    body.scrollTop = body.scrollHeight;
+    _newMsgCount = 0;
+    if (_pill) _pill.style.display = 'none';
+}
+if (_pill) _pill.addEventListener('click', scrollToBottom);
+
+function copyAllConsole() {
+    if (!body) return;
+    var text = '';
+    body.childNodes.forEach(function (n) { text += n.textContent + '\n'; });
+    navigator.clipboard.writeText(text).then(function () {
+        showToast('已复制全部输出', 'success');
+    }).catch(function () { showToast('复制失败', 'error'); });
+}
 
 if (input) {
     input.addEventListener('keydown', function (e) {

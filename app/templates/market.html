@@ -54,7 +54,7 @@ function renderMarket() {
     }
     var container = document.getElementById('marketList');
     if (list.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">---</div>未找到插件</div>';
+        container.innerHTML = '<div class="empty-state"><div class="icon" aria-hidden="true">🛒</div>未找到插件<p class="empty-hint">尝试更换关键词或市场源</p></div>';
         return;
     }
     container.innerHTML = list.map(function(p) {

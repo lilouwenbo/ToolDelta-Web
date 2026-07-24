@@ -11,10 +11,13 @@
 
 <div class="console-wrap">
     <div class="console-bar">
-        <span id="consoleStatus" role="status" aria-live="polite">🔴 未连接</span>
+        <span id="consoleStatus" class="status-conn disconnected" role="status" aria-live="polite">未连接</span>
+        <button class="btn btn-sm btn-outline" id="copyAllBtn" onclick="copyAllConsole()" aria-label="复制全部输出">复制</button>
+        <button class="btn btn-sm btn-outline" id="scrollBottomBtn" onclick="scrollToBottom()" style="display:none" aria-label="滚动到最新">↓ 最新</button>
+        <span id="newMsgPill" class="new-msg-pill" style="display:none"><span id="newMsgCount">0</span> 条新</span>
     </div>
     <div class="fav-strip" id="favStrip" aria-label="常用命令"></div>
-    <div class="console-body" id="consoleBody" role="log" aria-live="polite" aria-label="控制台输出" tabindex="0"></div>
+    <div class="console-body" id="consoleBody" role="log" aria-label="控制台输出" tabindex="0"></div>
     <div class="console-foot">
         <input id="consoleInput" placeholder="输入命令...（↑/↓ 翻历史，Tab 补全）" autocomplete="off" aria-label="命令输入">
         <button class="console-send-btn" onclick="sendConsoleInput()" aria-label="发送命令">发送</button>
@@ -38,8 +41,22 @@
 }
 .console-bar::before {
   content:''; width:9px; height:9px; border-radius:50%;
+  background:var(--danger); box-shadow:0 0 8px var(--danger);
+  transition: background .2s, box-shadow .2s;
+}
+.console-bar:has(.status-conn.connected)::before {
   background:var(--success); box-shadow:0 0 8px var(--success);
 }
+.status-conn.connected { color: var(--success); }
+.status-conn.disconnected { color: var(--danger); }
+.new-msg-pill {
+  margin-left:auto; background: var(--primary); color: #fff;
+  padding: 3px 10px; border-radius: 999px; font-size: 11px;
+  font-weight: 600; cursor: pointer; animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{ transform: scale(1); } 50%{ transform: scale(1.05); } }
+#copyAllBtn, #scrollBottomBtn { margin-left: auto; }
+#scrollBottomBtn { margin-left: 0; }
 .fav-strip { display:flex; flex-wrap:wrap; gap:6px; padding:8px 12px; background:rgba(255,255,255,0.03); border-bottom:1px solid var(--hairline); min-height:34px; align-items:center; }
 .fav-empty { font-size:12px; color:var(--ink-tertiary); }
 .fav-chip {

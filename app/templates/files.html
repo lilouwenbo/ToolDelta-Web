@@ -26,7 +26,8 @@
         </div>
     </div>
 
-    <div class="card" style="padding:0;overflow:hidden">
+    <div class="card drop-zone" id="dropZone" style="padding:0;overflow:hidden;position:relative">
+        <div class="drop-hint" id="dropHint">松开鼠标以上传文件</div>
         <div class="table-wrap">
             <table class="table">
                 <thead>
@@ -44,9 +45,28 @@
         <div id="emptyState" class="empty-state" style="display:none">
             <div class="icon" id="emptyIcon" aria-hidden="true">📁</div>
             <p id="emptyText">此目录为空</p>
+            <button class="btn btn-sm btn-outline" onclick="document.getElementById('uploadInput').click()">上传第一个文件</button>
         </div>
     </div>
 </div>
+
+<style>
+.drop-zone.dragover { border: 2px dashed var(--primary); background: rgba(94,106,210,0.06); }
+.drop-hint {
+  display:none; position:absolute; inset:0; z-index:5;
+  background: rgba(94,106,210,0.15); color: var(--primary);
+  font-size:18px; font-weight:600;
+  align-items:center; justify-content:center;
+  pointer-events:none;
+}
+.drop-zone.dragover .drop-hint { display:flex; }
+.up-btn {
+  margin-right:6px; padding:2px 8px; font-size:12px;
+  border:1px solid var(--hairline); border-radius: var(--r-sm);
+  background:var(--surface-1); cursor:pointer; color:var(--ink);
+}
+.up-btn:hover { background: var(--surface-3); }
+</style>
 
 <div class="modal-overlay" id="editorModal" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
     <div class="modal modal-lg">
@@ -131,7 +151,14 @@ function renderBreadcrumbs(current) {
     var el = document.getElementById('breadcrumbs');
     el.innerHTML = '';
     if (!current) return;
+    // 上级目录按钮（移动端友好）
     var parts = current.replace(/\\/g,'/').split('/');
+    var upBtn = document.createElement('button');
+    upBtn.className = 'up-btn';
+    upBtn.innerHTML = '↑ 上级';
+    upBtn.setAttribute('aria-label', '返回上级目录');
+    upBtn.onclick = function(){ navigateTo(parts.slice(0, -1).join('/')); };
+    el.appendChild(upBtn);
     parts.forEach(function(p, i) {
         var sep = document.createElement('span');
         sep.textContent = '/';
@@ -140,7 +167,7 @@ function renderBreadcrumbs(current) {
         var a = document.createElement('a');
         a.textContent = p;
         a.href = '#';
-        a.style.cssText = 'color:var(--primary);text-decoration:none';
+        a.className = 'breadcrumb-link';
         a.onclick = (function(path){ return function(){ navigateTo(path); }; })(parts.slice(0, i+1).join('/'));
         el.appendChild(a);
     });
@@ -297,6 +324,9 @@ function escapeHtml(s) {
 
 function uploadFiles(files) {
     if (!files || files.length === 0) return;
+    var uploadBtn = document.querySelector('[onclick*="uploadInput"]');
+    var origText = uploadBtn ? uploadBtn.textContent : '';
+    if (uploadBtn) { uploadBtn.disabled = true; uploadBtn.innerHTML = '<span class="btn-spinner"></span>上传中'; }
     var form = new FormData();
     form.append('path', CURRENT_PATH);
     for (var i = 0; i < files.length; i++) {
@@ -308,8 +338,11 @@ function uploadFiles(files) {
         if(d.success){ showToast('上传成功', 'success'); loadFiles(); }
         else { showToast(d.error||'上传失败', 'error'); }
     })
-    .catch(function(){ showToast('请求失败', 'error'); });
-    document.getElementById('uploadInput').value = '';
+    .catch(function(){ showToast('请求失败', 'error'); })
+    .finally(function(){
+        if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = origText; }
+        document.getElementById('uploadInput').value = '';
+    });
 }
 
 function deleteItem(path, isDir) {
@@ -327,13 +360,15 @@ function deleteItem(path, isDir) {
 
 function renameItem(path) {
     var oldName = path.split('/').pop().split('\\').pop();
-    var newName = prompt('输入新名称：', oldName);
-    if (!newName || newName === oldName) return;
-    fetch('/api/files/rename', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:path, new_name:newName}) })
-    .then(function(r){return r.json()})
-    .then(function(d){
-        if(d.success){ showToast('已重命名', 'success'); loadFiles(); }
-        else { showToast(d.error||'重命名失败', 'error'); }
+    showPrompt('重命名：' + oldName, '输入新名称', oldName, function(newName) {
+        if (!newName || newName === oldName) return;
+        fetch('/api/files/rename', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:path, new_name:newName}) })
+        .then(function(r){return r.json()})
+        .then(function(d){
+            if(d.success){ showToast('已重命名', 'success'); loadFiles(); }
+            else { showToast(d.error||'重命名失败', 'error'); }
+        })
+        .catch(function(){ showToast('请求失败', 'error'); });
     });
 }
 
@@ -370,14 +405,16 @@ function closeMoveCopy() {
 }
 
 function showNewFolder() {
-    var name = prompt('输入文件夹名称：');
-    if (!name) return;
-    var path = CURRENT_PATH ? CURRENT_PATH + '/' + name : name;
-    fetch('/api/files/mkdir', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:path}) })
-    .then(function(r){return r.json()})
-    .then(function(d){
-        if(d.success){ showToast('已创建', 'success'); loadFiles(); }
-        else { showToast(d.error||'创建失败', 'error'); }
+    showPrompt('新建文件夹', '输入文件夹名称', '', function(name) {
+        if (!name) return;
+        var path = CURRENT_PATH ? CURRENT_PATH + '/' + name : name;
+        fetch('/api/files/mkdir', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path:path}) })
+        .then(function(r){return r.json()})
+        .then(function(d){
+            if(d.success){ showToast('已创建', 'success'); loadFiles(); }
+            else { showToast(d.error||'创建失败', 'error'); }
+        })
+        .catch(function(){ showToast('请求失败', 'error'); });
     });
 }
 
@@ -428,5 +465,21 @@ function closeEditor() {
 }
 
 document.addEventListener('DOMContentLoaded', function(){ loadFiles(); });
+
+// 拖拽上传：在文件列表区域拖入文件即上传到当前目录
+(function() {
+    var dz = document.getElementById('dropZone');
+    if (!dz) return;
+    var dragCounter = 0;
+    dz.addEventListener('dragenter', function(e) { e.preventDefault(); dragCounter++; dz.classList.add('dragover'); });
+    dz.addEventListener('dragover', function(e) { e.preventDefault(); });
+    dz.addEventListener('dragleave', function(e) { e.preventDefault(); dragCounter--; if (dragCounter <= 0) { dragCounter = 0; dz.classList.remove('dragover'); } });
+    dz.addEventListener('drop', function(e) {
+        e.preventDefault(); dragCounter = 0; dz.classList.remove('dragover');
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+            uploadFiles(e.dataTransfer.files);
+        }
+    });
+})();
 </script>
 {% endblock %}
